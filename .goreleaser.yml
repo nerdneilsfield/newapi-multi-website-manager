@@ -1,0 +1,93 @@
+version: 2
+env:
+  - CGO_ENABLED=0
+
+builds:
+  -
+    id: go-template
+    binary: go-template
+    flags:
+      - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w
+      - -X github.com/nerdneilsfield/go-template/internal/buildinfo.Version={{.Version}}
+      - -X github.com/nerdneilsfield/go-template/internal/buildinfo.Commit={{.FullCommit}}
+      - -X github.com/nerdneilsfield/go-template/internal/buildinfo.Date={{.Date}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  -
+    ids:
+      - go-template
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+release:
+  github:
+    owner: nerdneilsfield
+    name: go-template
+
+dockers_v2:
+  - id: go-template
+    dockerfile: Dockerfile.goreleaser
+    ids:
+      - go-template
+    images:
+      - nerdneils/go-template
+      - ghcr.io/nerdneilsfield/go-template
+    tags:
+      - "{{ .Tag }}"
+      - "{{ if not .IsNightly }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      "io.artifacthub.package.readme-url": "https://raw.githubusercontent.com/nerdneilsfield/go-template/master/README.md"
+      "io.artifacthub.package.maintainers": "[{\"name\":\"dengqqi\",\"email\":\"dengqqi935@gmail.com\"}]"
+      "io.artifacthub.package.license": "MIT"
+      "org.opencontainers.image.description": "Go template application."
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.name": "{{ .ProjectName }}"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.version": "{{ .Version }}"
+      "org.opencontainers.image.source": "{{ .GitURL }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+    - '^test:'
+    - '^chore'
+    - 'merge conflict'
+    - Merge pull request
+    - Merge remote-tracking branch
+    - Merge branch
+    - go mod tidy
+  groups:
+    - title: Dependency updates
+      regexp: '^.*?(feat|fix)\(deps\)!?:.+$'
+      order: 300
+    - title: 'New Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 100
+    - title: 'Bug fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 200
+    - title: 'Documentation updates'
+      regexp: ^.*?docs(\([[:word:]]+\))??!?:.+$
+      order: 400
+    - title: Other work
+      order: 9999

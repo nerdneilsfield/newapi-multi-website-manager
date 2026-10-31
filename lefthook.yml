@@ -1,0 +1,23 @@
+pre-commit:
+  parallel: true
+  commands:
+    gofumpt:
+      glob: "*.go"
+      run: 'output=$(go tool gofumpt -l {staged_files}); if [ -n "$output" ]; then echo "$output"; echo "gofumpt: staged Go files need formatting" >&2; exit 1; fi'
+      staged_files: true
+      fail_text: "gofumpt: staged Go files need formatting"
+    goimports:
+      glob: "*.go"
+      run: 'output=$(go tool goimports -l -local github.com/nerdneilsfield/go-template {staged_files}); if [ -n "$output" ]; then echo "$output"; echo "goimports: staged Go files need import formatting" >&2; exit 1; fi'
+      staged_files: true
+      fail_text: "goimports: staged Go files need import formatting"
+    go-mod-tidy:
+      glob: "{go.mod,go.sum}"
+      run: 'go mod tidy -diff || { echo "go mod tidy: go.mod/go.sum are not tidy" >&2; exit 1; }'
+
+commit-msg:
+  commands:
+    conventional-commit:
+      run: >-
+        message=$(cat {1}); case "$message" in Merge\ *|Revert\ *) exit 0 ;; esac; printf "%s\n" "$message" | grep -Eq "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: .+" || { echo "commit-msg: use Conventional Commit format (e.g. feat: add command)" >&2; exit 1; }; exit 0
+      fail_text: "commit-msg: use Conventional Commit format (e.g. feat: add command)"

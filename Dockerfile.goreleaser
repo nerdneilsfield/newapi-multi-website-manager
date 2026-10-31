@@ -1,0 +1,9 @@
+FROM gcr.io/distroless/static-debian13:nonroot
+
+ARG TARGETPLATFORM
+
+USER nonroot:nonroot
+WORKDIR /app
+COPY ${TARGETPLATFORM}/go-template /app/go-template
+
+ENTRYPOINT ["/app/go-template"]
