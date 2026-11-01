@@ -11,7 +11,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/nerdneilsfield/go-template
+        - github.com/nerdneilsfield/newapi-multi-website-manager
 
 linters:
   default: standard

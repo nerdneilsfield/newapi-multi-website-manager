@@ -8,7 +8,7 @@ pre-commit:
       fail_text: "gofumpt: staged Go files need formatting"
     goimports:
       glob: "*.go"
-      run: 'output=$(go tool goimports -l -local github.com/nerdneilsfield/go-template {staged_files}); if [ -n "$output" ]; then echo "$output"; echo "goimports: staged Go files need import formatting" >&2; exit 1; fi'
+      run: 'output=$(go tool goimports -l -local github.com/nerdneilsfield/newapi-multi-website-manager {staged_files}); if [ -n "$output" ]; then echo "$output"; echo "goimports: staged Go files need import formatting" >&2; exit 1; fi'
       staged_files: true
       fail_text: "goimports: staged Go files need import formatting"
     go-mod-tidy:

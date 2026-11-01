@@ -4,16 +4,16 @@ env:
 
 builds:
   -
-    id: go-template
-    binary: go-template
+    id: napm
+    binary: napm
     flags:
       - -trimpath
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - -s -w
-      - -X github.com/nerdneilsfield/go-template/internal/buildinfo.Version={{.Version}}
-      - -X github.com/nerdneilsfield/go-template/internal/buildinfo.Commit={{.FullCommit}}
-      - -X github.com/nerdneilsfield/go-template/internal/buildinfo.Date={{.Date}}
+      - -X github.com/nerdneilsfield/newapi-multi-website-manager/internal/buildinfo.Version={{.Version}}
+      - -X github.com/nerdneilsfield/newapi-multi-website-manager/internal/buildinfo.Commit={{.FullCommit}}
+      - -X github.com/nerdneilsfield/newapi-multi-website-manager/internal/buildinfo.Date={{.Date}}
     goos:
       - linux
       - darwin
@@ -25,7 +25,7 @@ builds:
 archives:
   -
     ids:
-      - go-template
+      - napm
     formats: [tar.gz]
     format_overrides:
       - goos: windows
@@ -34,16 +34,16 @@ archives:
 release:
   github:
     owner: nerdneilsfield
-    name: go-template
+    name: newapi-multi-website-manager
 
 dockers_v2:
-  - id: go-template
+  - id: napm
     dockerfile: Dockerfile.goreleaser
     ids:
-      - go-template
+      - napm
     images:
-      - nerdneils/go-template
-      - ghcr.io/nerdneilsfield/go-template
+      - nerdneils/napm
+      - ghcr.io/nerdneilsfield/napm
     tags:
       - "{{ .Tag }}"
       - "{{ if not .IsNightly }}latest{{ end }}"
@@ -51,10 +51,10 @@ dockers_v2:
       - linux/amd64
       - linux/arm64
     labels:
-      "io.artifacthub.package.readme-url": "https://raw.githubusercontent.com/nerdneilsfield/go-template/master/README.md"
+      "io.artifacthub.package.readme-url": "https://raw.githubusercontent.com/nerdneilsfield/newapi-multi-website-manager/master/README.md"
       "io.artifacthub.package.maintainers": "[{\"name\":\"dengqqi\",\"email\":\"dengqqi935@gmail.com\"}]"
       "io.artifacthub.package.license": "MIT"
-      "org.opencontainers.image.description": "Go template application."
+      "org.opencontainers.image.description": "Manage multiple new-api platforms: users, balances and scheduled quota updates."
       "org.opencontainers.image.created": "{{ .Date }}"
       "org.opencontainers.image.name": "{{ .ProjectName }}"
       "org.opencontainers.image.revision": "{{ .FullCommit }}"

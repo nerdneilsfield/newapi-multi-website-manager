@@ -3,7 +3,10 @@ FROM gcr.io/distroless/static-debian13:nonroot
 ARG TARGETPLATFORM
 
 USER nonroot:nonroot
-WORKDIR /app
-COPY ${TARGETPLATFORM}/go-template /app/go-template
+WORKDIR /data
+COPY ${TARGETPLATFORM}/napm /app/napm
 
-ENTRYPOINT ["/app/go-template"]
+EXPOSE 8080
+VOLUME /data
+ENTRYPOINT ["/app/napm"]
+CMD ["serve", "--addr", "0.0.0.0:8080", "--db", "/data/napm.db"]

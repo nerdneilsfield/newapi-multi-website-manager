@@ -1,5 +1,5 @@
-projectname := "go-template"
-pkg := "github.com/nerdneilsfield/go-template"
+projectname := "napm"
+pkg := "github.com/nerdneilsfield/newapi-multi-website-manager"
 version := `git describe --tags --always --dirty 2>/dev/null || echo dev`
 commit := `git rev-parse --short HEAD 2>/dev/null || echo none`
 date := `date -u +%Y-%m-%dT%H:%M:%SZ`
@@ -15,7 +15,7 @@ build:
 
 # 安装 Golang 二进制文件
 install:
-    go install -ldflags '{{ldflags}}' .
+    dir=$(go env GOBIN); dir=${dir:-$(go env GOPATH)/bin}; go build -ldflags '{{ldflags}}' -o "$dir/{{projectname}}" .
 
 # 运行应用程序
 run:

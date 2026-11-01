@@ -1,5 +1,5 @@
-projectname := go-template
-PKG := github.com/nerdneilsfield/go-template
+projectname := napm
+PKG := github.com/nerdneilsfield/newapi-multi-website-manager
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -14,8 +14,9 @@ help: ## list makefile targets
 build: ## build golang binary
 	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o $(projectname) .
 
+# go install would name the binary after the module path, so build it by name.
 install: ## install the app
-	go install -ldflags '$(LDFLAGS)' .
+	dir=$$(go env GOBIN); dir=$${dir:-$$(go env GOPATH)/bin}; go build -ldflags '$(LDFLAGS)' -o "$$dir/$(projectname)" .
 
 run: ## run the app
 	go run -ldflags '$(LDFLAGS)' .
