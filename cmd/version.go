@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/nerdneilsfield/go-template/internal/buildinfo"
+	"github.com/nerdneilsfield/newapi-multi-website-manager/internal/buildinfo"
 )
 
 func newVersionCmd() *cobra.Command {
@@ -17,7 +17,7 @@ func newVersionCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			loggerFrom(cmd).Debug("printing version")
 			_, err := fmt.Fprintf(cmd.OutOrStdout(),
-				"go-template %s\ncommit: %s\nbuilt: %s\ngo: %s %s/%s\n",
+				"napm %s\ncommit: %s\nbuilt: %s\ngo: %s %s/%s\n",
 				buildinfo.Version, buildinfo.Commit, buildinfo.Date,
 				runtime.Version(), runtime.GOOS, runtime.GOARCH)
 			return err

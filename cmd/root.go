@@ -1,4 +1,4 @@
-// Package cmd defines the go-template command tree.
+// Package cmd defines the napm command tree.
 package cmd
 
 import (
@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/nerdneilsfield/go-template/internal/logging"
+	"github.com/nerdneilsfield/newapi-multi-website-manager/internal/logging"
 )
 
 type loggerKey struct{}
@@ -17,8 +17,8 @@ func NewRootCmd() *cobra.Command {
 	var verbose bool
 
 	cmd := &cobra.Command{
-		Use:           "go-template",
-		Short:         "go-template is a template for go projects.",
+		Use:           "napm",
+		Short:         "Manage multiple new-api platforms.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
@@ -33,6 +33,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
 
 	cmd.AddCommand(newVersionCmd())
+	cmd.AddCommand(newServeCmd())
 	return cmd
 }
 

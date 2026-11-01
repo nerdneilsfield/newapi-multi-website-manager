@@ -1,4 +1,4 @@
-// Command go-template is the template CLI entry point.
+// Command napm manages multiple new-api platforms.
 package main
 
 import (
@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/nerdneilsfield/go-template/cmd"
+	"github.com/nerdneilsfield/newapi-multi-website-manager/cmd"
 )
 
 func main() {

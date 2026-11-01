@@ -15,7 +15,7 @@ func TestVersionCmd(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if !strings.HasPrefix(out.String(), "go-template dev\n") {
+	if !strings.HasPrefix(out.String(), "napm dev\n") {
 		t.Fatalf("unexpected output: %q", out.String())
 	}
 }

@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Manage several new-api sites from one place: users, balances, scheduled jobs.">
+<title>new-api 多平台管理</title>
+<style>
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Rim (deal 2/3, seed admin-console-operators-managing-79f0·0bb222f0·2026-11-01·r0)
+ * nav: top bar with a tab row · signature: the ledger (figures strip over a ruled group table) · states: loading, empty, error, full
+ * axes: dark/grotesk-sans/warm · posture: committed · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P3 H3 E3 S3 R3 V3 · weakest: V, no webfont so the binary stays one offline file; system sans and mono carry the voice */
+:root {
+  color-scheme: dark;
+  --space-3xs: 2px; --space-2xs: 4px; --space-xs: 8px; --space-sm: 12px; --space-md: 16px; --space-lg: 24px; --space-xl: 40px; --space-2xl: 64px;
+  --text-xs: 0.75rem; --text-sm: 0.875rem; --text-md: 1rem; --text-lg: 1.2rem; --text-section: 1.2rem; --text-display: 1.728rem;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-micro: 120ms; --dur-short: 220ms;
+  --color-error: oklch(72% 0.15 27); --color-success: oklch(76% 0.13 150);
+  --container: 1440px; --gutter: 64px;
+  --color-paper: oklch(9% 0.008 75); --color-paper-2: oklch(12.5% 0.009 75); --color-paper-3: oklch(6.5% 0.007 75);
+  --color-ink: oklch(94% 0.010 80); --color-ink-2: oklch(84% 0.011 80); --color-muted: oklch(68% 0.012 80); --color-muted-2: oklch(50% 0.010 80);
+  --color-rule: oklch(25% 0.010 78); --color-rule-2: oklch(16% 0.009 78);
+  --color-accent: oklch(72% 0.17 45); --color-accent-ink: oklch(10% 0.02 45); --color-focus: oklch(78% 0.15 45);
+  --font-display: ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-body: var(--font-display);
+  --font-outlier: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --tracking-display: -0.02em; --display-weight: 500;
+  --control-h: 36px;
+}
+@media (max-width: 60rem) { :root { --gutter: var(--space-lg); } }
+@media (max-width: 40rem) { :root { --gutter: var(--space-md); } }
+@media (pointer: coarse) { :root { --control-h: 44px; } }
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { overflow-x: clip; }
+html { scrollbar-color: var(--color-muted) var(--color-paper); }
+body { margin: 0; background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body); font-size: var(--text-sm); line-height: 1.55; -webkit-font-smoothing: antialiased; caret-color: var(--color-accent); }
+::selection { background: color-mix(in oklab, var(--color-accent) 35%, transparent); color: var(--color-ink); }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+h1, h2 { margin: 0; font-family: var(--font-display); font-weight: var(--display-weight); font-synthesis: none; letter-spacing: var(--tracking-display); line-height: 1.2; overflow-wrap: break-word; min-width: 0; text-wrap: balance; }
+h1 { font-size: var(--text-lg); }
+h2 { font-size: var(--text-section); }
+p { margin: 0; }
+[hidden] { display: none !important; }
+button, input, select { font: inherit; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.container { width: 100%; max-width: var(--container); margin-inline: auto; padding-inline: var(--gutter); }
+.bar { border-bottom: 1px solid var(--color-rule); background: var(--color-paper-2); }
+.bar .container { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); min-height: 56px; padding-block: var(--space-xs); }
+.bar h1 { margin-right: auto; }
+.who { color: var(--color-muted); }
+.tabs { border-bottom: 1px solid var(--color-rule); }
+.tabs .container { display: flex; gap: var(--space-xs); overflow-x: auto; }
+.tabs button { flex: none; min-height: 40px; padding: 0 var(--space-sm); border: 0; border-bottom: 2px solid transparent; background: none; color: var(--color-muted); }
+.tabs button:hover { color: var(--color-ink); }
+.tabs button[aria-current="page"] { color: var(--color-ink); border-bottom-color: var(--color-accent); }
+
+main.container { padding-block: var(--space-lg) var(--space-2xl); }
+.sec { margin-top: var(--space-xl); }
+.sec:first-child { margin-top: 0; }
+.sec > h2 { padding-top: var(--space-md); border-top: 1px solid var(--color-rule); margin-bottom: var(--space-sm); }
+.hint { color: var(--color-muted); max-width: 65ch; margin-bottom: var(--space-sm); }
+.well { background: var(--color-paper-2); border: 1px solid var(--color-rule); padding: var(--space-md); }
+
+button, input, select { min-height: var(--control-h); padding: 0 var(--space-sm); border: 1px solid var(--color-muted-2); border-radius: 0; background: var(--color-paper); color: var(--color-ink); transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out); }
+select { max-width: 100%; }
+input::placeholder { color: var(--color-muted-2); }
+input:focus-visible, select:focus-visible { outline-offset: -2px; }
+button { cursor: pointer; }
+button:hover:not(:disabled) { background: var(--color-paper-2); border-color: var(--color-muted); }
+button.p { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); font-weight: 500; }
+button.p:hover:not(:disabled) { background: color-mix(in oklab, var(--color-accent) 88%, var(--color-ink)); border-color: transparent; }
+button.d { color: var(--color-error); }
+button.link { border-color: transparent; background: none; color: var(--color-muted); }
+button:active:not(:disabled) { background: var(--color-paper-3); }
+button.p:active:not(:disabled) { background: color-mix(in oklab, var(--color-accent) 75%, var(--color-paper)); }
+button:disabled, input:disabled, select:disabled { opacity: 0.55; cursor: not-allowed; }
+input[type="checkbox"] { min-height: 0; width: 18px; height: 18px; padding: 0; accent-color: var(--color-accent); cursor: pointer; }
+.chk { display: inline-flex; align-items: center; gap: var(--space-xs); min-height: var(--control-h); margin-right: var(--space-sm); cursor: pointer; }
+input[type="number"] { font-family: var(--font-outlier); }
+
+.row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-sm); margin-bottom: var(--space-sm); }
+.row.mid { align-items: center; }
+.f { display: flex; flex-direction: column; gap: var(--space-2xs); min-width: 0; }
+.f .lbl { color: var(--color-muted); }
+.f input { min-width: 12rem; }
+.msg { min-height: 1lh; }
+.msg.bad { color: var(--color-error); white-space: pre-wrap; }
+.msg.good { color: var(--color-success); }
+.msg.note { margin-bottom: var(--space-md); }
+.mute { color: var(--color-muted); }
+
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: var(--space-xs) var(--space-sm); border-bottom: 1px solid var(--color-rule-2); vertical-align: middle; }
+th { color: var(--color-muted); font-weight: 500; white-space: nowrap; border-bottom-color: var(--color-rule); }
+tbody tr:hover td { background: var(--color-paper-2); }
+td.mono { font-family: var(--font-outlier); }
+td.n, th.n { text-align: right; font-family: var(--font-outlier); font-variant-numeric: tabular-nums; }
+th.n { font-family: var(--font-display); }
+td input:not([type="checkbox"]) { width: 100%; min-width: 9rem; }
+.scroll td:first-child, .scroll th:first-child { position: sticky; left: 0; background: var(--color-paper); }
+tbody tr:hover td:first-child { background: var(--color-paper-2); }
+td .acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.st-ok { color: var(--color-success); } .st-bad { color: var(--color-error); } .st-mute { color: var(--color-muted); }
+pre { margin: var(--space-2xs) 0 0; white-space: pre-wrap; font-family: var(--font-outlier); font-size: var(--text-xs); color: var(--color-error); }
+
+.figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1px; background: var(--color-rule); border: 1px solid var(--color-rule); margin-bottom: var(--space-lg); }
+.fig { background: var(--color-paper); padding: var(--space-md) var(--space-lg); }
+.fig b { display: block; font-family: var(--font-outlier); font-weight: 400; font-size: var(--text-display); line-height: 1.2; letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.fig span { color: var(--color-muted); }
+@media (max-width: 40rem) { .fig { padding: var(--space-sm) var(--space-md); } .fig b { font-size: var(--text-lg); } }
+
+.empty { border: 1px dashed var(--color-muted-2); padding: var(--space-lg); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
+.fail { border: 1px solid var(--color-error); padding: var(--space-md); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); color: var(--color-error); white-space: pre-wrap; }
+.sk { display: grid; gap: var(--space-xs); }
+.sk i { display: block; height: 20px; background: var(--color-paper-2); border-bottom: 1px solid var(--color-rule-2); }
+.sk i:nth-child(2) { width: 85%; } .sk i:nth-child(3) { width: 70%; } .sk i:nth-child(4) { width: 55%; }
+
+#login { max-width: 22rem; margin: 15dvh auto 0; padding-inline: var(--space-md); }
+#login .well { display: flex; flex-direction: column; gap: var(--space-md); }
+#login .f input { width: 100%; }
+.lang { position: fixed; top: var(--space-md); right: var(--space-md); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const D={
+zh:{
+app:'new-api 多平台管理',user:'用户名',pass:'密码',login:'登录',logout:'退出',langTo:'English',platform:'平台',loading:'加载中…',retry:'重试',
+'tab.stats':'统计','tab.users':'用户','tab.quota':'调整余额','tab.jobs':'定时任务','tab.runs':'执行记录','tab.audit':'操作记录','tab.platforms':'平台管理','tab.admins':'管理员',
+noPlatRoot:'还没有平台，请到「平台管理」添加。',noPlatUser:'你还没有被授权任何平台，请联系 root 管理员。',addPlat:'添加平台',
+refresh:'刷新统计',refreshing:'刷新中…',updatedAt:'更新于 {t}',noData:'尚无数据',lastFail:'上次刷新: {s}\n{e}',
+users:'用户数',totalBal:'总余额',totalUsed:'总用量',requests:'请求数',group:'分组',balance:'余额',used:'用量',
+keyword:'关键词',keywordPh:'用户名/邮箱/ID',search:'搜索',total:'共 {total} 个，第 {page}/{pages} 页 (余额单位: 额度原值)',
+username:'用户名',usedQ:'已用',adjust:'调额',prev:'上一页',next:'下一页',noUsers:'没有匹配的用户',
+adjustNow:'立即调整余额',exec:'执行',started:'已开始，进度见「执行记录」',
+confirmQ:'确认对 {target} 执行「{mode} {amount} {unit}」？',tGroup:'分组 {g} 的全部用户',tUsers:'{n} 个用户',
+'mode.add':'增加','mode.subtract':'扣减','mode.override':'设为','unit.usd':'美元','unit.quota':'额度',
+op:'方式',amount:'数值',unit:'单位',target:'对象',unitUsdL:'美元(按该站 quota_per_unit 换算)',unitQuotaL:'原始额度',
+tgtGroup:'整个分组',tgtUsers:'指定用户 ID',groupName:'分组名',userIds:'用户 ID，逗号分隔',
+eAmount:'请输入有效数值',eGroup:'请输入分组名',eIds:'用户 ID 无效',
+jobs:'定时任务',name:'名称',kind:'类型',spec:'表达式',content:'内容',enabled:'启用',del:'删除',
+'kind.quota':'调整余额','kind.refresh':'刷新统计','kind.quotaS':'调额','kind.refreshS':'刷新',
+delJob:'删除任务 {n}？',noJobs:'暂无任务',addJob:'新增任务',jobName:'任务名称',cron:'cron',
+cronHint:'5 段 cron(分 时 日 月 周)，或 @every 6h、@daily；使用服务器本地时区。',
+addWarn:'提示：定时「增加」不是幂等的，同一时刻重复触发会重复加；需要固定结果请用「设为」。',
+planG:'分组 {g}',planU:'用户 {ids}',
+runs:'最近 50 次执行',time:'时间',from:'来源',status:'状态',okTotal:'成功/总数',noRuns:'暂无记录',
+'st.running':'运行中','st.ok':'成功','st.partial':'部分成功','st.failed':'失败','st.interrupted':'被中断','st.skipped':'已跳过',
+sched:'定时:',cronBy:'定时',
+audit:'操作记录',auditRoot:'所有管理员的操作，新的在前。',auditOwn:'你自己的操作，新的在前。',more:'加载更早的记录',noAudit:'暂无操作记录',actor:'操作人',action:'操作',detail:'详情',
+'a.login':'登录','a.refresh':'刷新统计','a.quota':'调整余额','a.job.create':'新增任务','a.job.update':'修改任务','a.job.delete':'删除任务',
+'a.platform.create':'添加平台','a.platform.update':'修改平台','a.platform.delete':'删除平台','a.admin.create':'新增管理员','a.admin.update':'修改管理员','a.admin.delete':'删除管理员',
+tokenChanged:'更换了令牌',pwChanged:'修改了密码',
+platforms:'平台',tokenKeep:'留空保持不变',save:'保存',saved:'已保存',delPlat:'删除平台 {n} 及其任务和记录？',noPlats:'暂无平台',addPlatH:'新增平台',
+patHint:'Token 用目标站「安全设置 → Access Tokens」创建的 PAT，需要权限 user:read、user:write、group:read。目标站版本需 ≥ v1.0.0-rc.41。',
+add:'添加',
+admins:'管理员',adminHint:'非 root 管理员只能看到并操作被勾选的平台；root 可管理全部平台与管理员。改密码或权限会使该管理员的登录失效。',
+adminPlats:'可管理的平台',pwKeep:'留空不改',pwNew:'密码(≥8位)',create:'新增',delAdmin:'删除 {n}？'
+},
+en:{
+app:'new-api multi-site manager',user:'Username',pass:'Password',login:'Sign in',logout:'Sign out',langTo:'中文',platform:'Platform',loading:'Loading…',retry:'Retry',
+'tab.stats':'Stats','tab.users':'Users','tab.quota':'Adjust balance','tab.jobs':'Schedules','tab.runs':'Runs','tab.audit':'Audit log','tab.platforms':'Platforms','tab.admins':'Admins',
+noPlatRoot:'No platforms yet. Add one under Platforms.',noPlatUser:'You have not been granted any platform. Ask a root admin.',addPlat:'Add a platform',
+refresh:'Refresh stats',refreshing:'Refreshing…',updatedAt:'Updated {t}',noData:'No data yet',lastFail:'Last refresh: {s}\n{e}',
+users:'Users',totalBal:'Total balance',totalUsed:'Total usage',requests:'Requests',group:'Group',balance:'Balance',used:'Usage',
+keyword:'Keyword',keywordPh:'username / email / ID',search:'Search',total:'{total} in total, page {page}/{pages} (balance in raw quota units)',
+username:'Username',usedQ:'Used',adjust:'Adjust',prev:'Previous',next:'Next',noUsers:'No matching users',
+adjustNow:'Adjust balance now',exec:'Run',started:'Started. Progress is under Runs.',
+confirmQ:'Apply “{mode} {amount} {unit}” to {target}?',tGroup:'all users in group {g}',tUsers:'{n} users',
+'mode.add':'Add','mode.subtract':'Subtract','mode.override':'Set to','unit.usd':'USD','unit.quota':'quota',
+op:'Operation',amount:'Amount',unit:'Unit',target:'Target',unitUsdL:'USD (converted with the site’s quota_per_unit)',unitQuotaL:'Raw quota',
+tgtGroup:'Whole group',tgtUsers:'Specific user IDs',groupName:'Group name',userIds:'User IDs, comma separated',
+eAmount:'Enter a valid amount',eGroup:'Enter a group name',eIds:'Invalid user ID',
+jobs:'Schedules',name:'Name',kind:'Type',spec:'Schedule',content:'Content',enabled:'Enabled',del:'Delete',
+'kind.quota':'Adjust balance','kind.refresh':'Refresh stats','kind.quotaS':'Adjust','kind.refreshS':'Refresh',
+delJob:'Delete job {n}?',noJobs:'No jobs yet',addJob:'Add job',jobName:'Job name',cron:'cron',
+cronHint:'5-field cron (min hour day month weekday), or @every 6h, @daily. Uses the server’s local time zone.',
+addWarn:'Note: a scheduled “Add” is not idempotent. A repeated trigger adds again. Use “Set to” for a fixed result.',
+planG:'group {g}',planU:'users {ids}',
+runs:'Last 50 runs',time:'Time',from:'Source',status:'Status',okTotal:'OK / total',noRuns:'No runs yet',
+'st.running':'Running','st.ok':'OK','st.partial':'Partial','st.failed':'Failed','st.interrupted':'Interrupted','st.skipped':'Skipped',
+sched:'Scheduled: ',cronBy:'scheduler',
+audit:'Audit log',auditRoot:'Actions of all admins, newest first.',auditOwn:'Your own actions, newest first.',more:'Load older entries',noAudit:'No actions recorded yet',actor:'Admin',action:'Action',detail:'Details',
+'a.login':'Signed in','a.refresh':'Refresh stats','a.quota':'Adjust balance','a.job.create':'Added job','a.job.update':'Changed job','a.job.delete':'Deleted job',
+'a.platform.create':'Added platform','a.platform.update':'Changed platform','a.platform.delete':'Deleted platform','a.admin.create':'Added admin','a.admin.update':'Changed admin','a.admin.delete':'Deleted admin',
+tokenChanged:'token replaced',pwChanged:'password changed',
+platforms:'Platforms',tokenKeep:'Leave empty to keep',save:'Save',saved:'Saved',delPlat:'Delete platform {n} with its jobs and runs?',noPlats:'No platforms yet',addPlatH:'Add platform',
+patHint:'Use a PAT created on the target site under Security Settings → Access Tokens, with scopes user:read, user:write and group:read. The site must be v1.0.0-rc.41 or later.',
+add:'Add',
+admins:'Admins',adminHint:'A non-root admin sees and operates only the ticked platforms. Root manages all platforms and admins. Changing a password or permissions signs that admin out.',
+adminPlats:'Platforms they can manage',pwKeep:'Leave empty to keep',pwNew:'Password (8+ chars)',create:'Add',delAdmin:'Delete {n}?'
+}};
+// Messages the server sends in Chinese, keyed by the exact text or by prefix.
+const SRV={
+'密码至少 8 位':'Password must be at least 8 characters','需要 application/json':'Content-Type must be application/json',
+'需要名称和以 http(s):// 开头的 URL(不能带用户名密码)':'A name and a URL starting with http(s):// are required (no username or password in the URL)',
+'需要 plan':'A plan is required','需要 root 管理员':'Root admin required','不能取消自己的 root 权限':'You cannot remove your own root permission',
+'新平台需要 token':'A new platform needs a token','未登录':'Not signed in','平台不存在':'Platform not found','请求格式错误':'Malformed request',
+'跨站请求被拒绝':'Cross-site request rejected','用户名或密码错误':'Wrong username or password','尝试次数过多，请稍后再试':'Too many attempts, try again later',
+'密码过长(bcrypt 上限 72 字节)':'Password too long (bcrypt limit is 72 bytes)','kind 必须是 refresh 或 quota':'kind must be refresh or quota',
+'该平台有任务正在运行':'A task is already running on this platform','增加/扣减的金额必须大于 0':'The amount for add/subtract must be greater than 0',
+'金额不能为负':'The amount cannot be negative','mode 必须是 add / subtract / override':'mode must be add, subtract or override',
+'unit 必须是 usd 或 quota':'unit must be usd or quota','必须且只能指定 group 或 user_ids 之一':'Specify exactly one of group or user_ids',
+'金额超过 new-api 余额上限':'The amount exceeds the new-api balance limit'};
+const SRVP=[['保存失败(名称可能重复): ','Save failed (the name may already exist): '],['创建失败(用户名可能重复): ','Create failed (the username may already exist): '],
+['保存失败: ','Save failed: '],['定时表达式无效(5 段 cron 或 @every 1h): ','Invalid schedule (5-field cron or @every 1h): ']];
+
+const S={me:null,platforms:[],cur:null,tab:'stats',lang:'zh'};
+try{S.lang=localStorage.getItem('napm.lang')||''}catch{}
+if(!D[S.lang])S.lang=(navigator.language||'').toLowerCase().startsWith('zh')?'zh':'en';
+const t=(k,v)=>{let s=D[S.lang][k]??D.zh[k]??k;if(v)for(const[a,b]of Object.entries(v))s=s.replaceAll('{'+a+'}',b);return s};
+const errText=m=>{if(S.lang==='zh')return m;if(SRV[m])return SRV[m];for(const[a,b]of SRVP)if(m.startsWith(a))return b+m.slice(a.length);return m};
+const loc=()=>S.lang==='zh'?'zh-CN':'en-GB';
+function setLang(l){
+  S.lang=l;try{localStorage.setItem('napm.lang',l)}catch{}
+  document.documentElement.lang=l==='zh'?'zh-CN':'en';document.title=t('app');
+  S.me?render():loginView();
+}
+
+const $=(tag,a={},...k)=>{const e=document.createElement(tag);if(tag==='button'&&!a.type)e.type='button';for(const[x,v]of Object.entries(a)){if(x==='on')for(const[ev,f]of Object.entries(v))e.addEventListener(ev,f);else if(x in e&&x!=='style')e[x]=v;else e.setAttribute(x,v)}for(const c of k.flat())if(c!=null)e.append(c);return e};
+const api=async(m,u,b)=>{const r=await fetch(u,{method:m,headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok){if(r.status===401&&S.me)boot();throw new Error(errText(j.error||r.statusText))}return j};
+const app=document.getElementById('app');
+const fmtT=x=>x?new Date(x*1000).toLocaleString(loc()):'-';
+const nf=x=>new Intl.NumberFormat(loc()).format(x);
+const money=(q,u)=>new Intl.NumberFormat(loc(),{minimumFractionDigits:2,maximumFractionDigits:2}).format(q/(u||500000));
+const flash=(el,msg,bad)=>{el.textContent=msg;el.className='msg '+(bad?'bad':'good')};
+const fld=(label,ctl)=>$('label',{className:'f'},$('span',{className:'lbl'},label),ctl);
+const sec=(title,...k)=>$('section',{className:'sec'},title?$('h2',{},title):null,...k);
+const tbl=(head,rows)=>$('div',{className:'scroll'},$('table',{},$('thead',{},$('tr',{},head)),$('tbody',{},rows)));
+const skeleton=()=>$('div',{className:'sk',role:'status','aria-busy':'true'},$('span',{className:'visually-hidden'},t('loading')),$('i'),$('i'),$('i'),$('i'));
+const empty=(msg,btn)=>$('div',{className:'empty'},$('p',{},msg),btn);
+const failBox=(e,retry)=>$('div',{className:'fail',role:'alert'},e.message,retry?$('button',{on:{click:retry}},t('retry')):null);
+
+const TABS=['stats','users','quota','jobs','runs','audit','platforms','admins'];
+function readHash(){
+  const q=new URLSearchParams(location.hash.slice(1));
+  if(TABS.includes(q.get('tab')))S.tab=q.get('tab');
+  const p=+q.get('p');if(p)S.cur=p;
+}
+function go(patch){
+  Object.assign(S,patch);
+  const h='#tab='+S.tab+(S.cur!=null?'&p='+S.cur:'');
+  if(location.hash!==h)history.pushState(null,'',h);
+  render();
+}
+addEventListener('popstate',()=>{if(!S.me)return;readHash();if(!S.platforms.some(p=>p.id===S.cur))S.cur=S.platforms[0]?.id??null;render()});
+
+async function boot(){
+  S.me=null; // while null, a 401 means "not logged in yet" and must not call boot() again
+  try{S.me=await api('GET','/api/me')}catch{return loginView()}
+  S.platforms=await api('GET','/api/platforms');
+  readHash();
+  if(!S.platforms.some(p=>p.id===S.cur))S.cur=S.platforms[0]?.id??null;
+  render();
+}
+const langBtn=()=>$('button',{className:'lang',on:{click:()=>setLang(S.lang==='zh'?'en':'zh')}},t('langTo'));
+function loginView(){
+  const u=$('input',{name:'username',autocomplete:'username',required:true}),p=$('input',{name:'password',type:'password',autocomplete:'current-password',required:true}),e=$('div',{className:'msg bad',role:'alert'});
+  const go=async()=>{try{await api('POST','/api/login',{username:u.value,password:p.value});boot()}catch(x){e.textContent=x.message}};
+  const form=$('form',{className:'well',on:{submit:ev=>{ev.preventDefault();go()}}},fld(t('user'),u),fld(t('pass'),p),$('button',{type:'submit',className:'p'},t('login')),e);
+  app.replaceChildren(langBtn(),$('div',{id:'login'},$('h1',{},t('app')),$('div',{style:'height:var(--space-md)'}),form));
+  u.focus();
+}
+function render(){
+  clearInterval(timer);
+  const tabs=TABS.filter(k=>S.me.root||!['platforms','admins'].includes(k));
+  if(!tabs.includes(S.tab))S.tab='stats';
+  const sel=$('select',{'aria-label':t('platform'),on:{change:e=>go({cur:+e.target.value})}},S.platforms.map(p=>$('option',{value:p.id,selected:p.id===S.cur},p.name)));
+  const nav=$('nav',{className:'tabs','aria-label':t('app')},$('div',{className:'container'},tabs.map(k=>$('button',{'aria-current':S.tab===k?'page':null,on:{click:()=>go({tab:k})}},t('tab.'+k)))));
+  const body=$('main',{className:'container'});
+  app.replaceChildren(
+    $('header',{className:'bar'},$('div',{className:'container'},$('h1',{},t('app')),S.platforms.length?sel:null,$('span',{className:'who'},S.me.username+(S.me.root?' (root)':'')),
+      $('button',{on:{click:()=>setLang(S.lang==='zh'?'en':'zh')}},t('langTo')),
+      $('button',{on:{click:async()=>{await api('POST','/api/logout',{});boot()}}},t('logout')))),
+    nav,body);
+  const needsP=!['audit','platforms','admins'].includes(S.tab);
+  if(needsP&&S.cur==null)return body.append(S.me.root?empty(t('noPlatRoot'),$('button',{className:'p',on:{click:()=>go({tab:'platforms'})}},t('addPlat'))):empty(t('noPlatUser')));
+  body.append(skeleton());
+  const run=()=>views[S.tab](body).catch(e=>body.replaceChildren(failBox(e,()=>{body.replaceChildren(skeleton());run()})));
+  run();
+}
+const P=()=>'/api/platforms/'+S.cur;
+const desc=p=>`${t('mode.'+p.mode)} ${p.amount} ${t('unit.'+p.unit)} → ${p.group?t('planG',{g:p.group}):t('planU',{ids:p.user_ids.join(',')})}`;
+let timer;
+const poll=(fn)=>{clearInterval(timer);timer=setInterval(fn,2000)};
+
+const views={
+async stats(el){
+  const msg=$('span',{className:'msg',role:'status'});
+  const draw=async()=>{
+    const d=await api('GET',P()+'/stats');const s=d.stats,r=d.last_run;
+    const run=r&&r.status==='running';
+    const parts=[$('div',{className:'row mid'},$('button',{className:'p',disabled:run,on:{click:async()=>{try{await api('POST',P()+'/refresh',{});track()}catch(e){flash(msg,e.message,1)}}}},run?t('refreshing'):t('refresh')),
+        $('span',{className:'mute'},s?t('updatedAt',{t:fmtT(s.at)}):t('noData')),msg)];
+    if(r&&r.status!=='running'&&r.kind==='refresh'&&r.status!=='ok')parts.push($('div',{className:'msg bad note'},t('lastFail',{s:t('st.'+r.status),e:r.errors})));
+    if(s){const u=s.quota_per_unit;
+      parts.push($('div',{className:'figs'},[[t('users'),nf(s.users)],[t('totalBal'),money(s.quota,u)],[t('totalUsed'),money(s.used,u)],[t('requests'),nf(s.requests)]].map(([k,v])=>$('div',{className:'fig'},$('b',{},v),$('span',{},k)))),
+        $('h2',{style:'margin-bottom:var(--space-sm)'},t('group')),
+        tbl([t('group'),t('users'),t('balance'),t('used'),t('requests')].map((h,i)=>$('th',{className:i?'n':''},h)),
+          s.groups.map(g=>$('tr',{},$('td',{},g.name),$('td',{className:'n'},nf(g.users)),$('td',{className:'n'},money(g.quota,u)),$('td',{className:'n'},money(g.used,u)),$('td',{className:'n'},nf(g.requests))))));
+    }else parts.push(empty(t('noData')));
+    el.replaceChildren(sec(null,...parts));
+    return run;
+  };
+  const track=async()=>{if(await draw())poll(async()=>{if(!await draw())clearInterval(timer)})};
+  track();
+},
+async users(el){
+  const q=$('input',{name:'keyword',placeholder:t('keywordPh')}),g=$('input',{name:'group'}),out=$('div'),msg=$('span',{className:'msg',role:'status'});
+  let page=1;
+  const load=async()=>{
+    out.replaceChildren(skeleton());
+    try{
+      const d=await api('GET',P()+'/users?page='+page+'&group='+encodeURIComponent(g.value)+'&keyword='+encodeURIComponent(q.value));
+      const pages=Math.max(1,Math.ceil(d.total/100));
+      out.replaceChildren($('p',{className:'hint'},t('total',{total:nf(d.total),page,pages})),
+        d.items.length?tbl(['ID',t('username'),t('group'),t('balance'),t('usedQ'),t('requests'),''].map((h,i)=>$('th',{className:i>2&&i<6?'n':''},h)),
+          d.items.map(u=>$('tr',{},$('td',{className:'n'},u.id),$('td',{},u.username),$('td',{},u.group),$('td',{className:'n'},nf(u.quota)),$('td',{className:'n'},nf(u.used_quota)),$('td',{className:'n'},nf(u.request_count)),
+            $('td',{},$('button',{on:{click:()=>{S.prefill=String(u.id);go({tab:'quota'})}}},t('adjust')))))):empty(t('noUsers')),
+        $('div',{className:'row mid',style:'margin-top:var(--space-sm)'},$('button',{disabled:page<=1,on:{click:()=>{page--;load()}}},t('prev')),$('button',{disabled:page>=pages,on:{click:()=>{page++;load()}}},t('next'))));
+      msg.textContent='';
+    }catch(e){out.replaceChildren(failBox(e,load))}
+  };
+  el.replaceChildren(sec(null,$('div',{className:'row'},fld(t('keyword'),q),fld(t('group'),g),$('button',{className:'p',on:{click:()=>{page=1;load()}}},t('search')),msg),out));
+  load();
+},
+async quota(el){
+  const form=quotaForm(S.prefill?{user:S.prefill}:{});S.prefill=null;
+  const msg=$('div',{className:'msg',role:'status'}),go=$('button',{className:'p'},t('exec'));
+  go.addEventListener('click',async()=>{
+    let plan;try{plan=form.plan()}catch(e){return flash(msg,e.message,1)}
+    const target=plan.group?t('tGroup',{g:plan.group}):t('tUsers',{n:plan.user_ids.length});
+    if(!confirm(t('confirmQ',{target,mode:t('mode.'+plan.mode),amount:plan.amount,unit:t('unit.'+plan.unit)})))return;
+    try{await api('POST',P()+'/quota',plan);flash(msg,t('started'))}catch(e){flash(msg,e.message,1)}
+  });
+  el.replaceChildren(sec(t('adjustNow'),$('div',{className:'well'},form.el,$('div',{className:'row mid'},go),msg)));
+},
+async jobs(el){
+  const list=await api('GET',P()+'/jobs');
+  const name=$('input',{name:'name'}),spec=$('input',{name:'spec',value:'0 3 * * *',placeholder:'0 3 * * *'}),kind=$('select',{},$('option',{value:'refresh'},t('kind.refresh')),$('option',{value:'quota'},t('kind.quota')));
+  const form=quotaForm({}),msg=$('div',{className:'msg',role:'status'}),lmsg=$('div',{className:'msg',role:'status'}),fw=$('div',{},form.el);
+  const sync=()=>fw.style.display=kind.value==='quota'?'':'none';kind.addEventListener('change',sync);sync();
+  const add=$('button',{className:'p',on:{click:async()=>{
+    try{const b={name:name.value,spec:spec.value,kind:kind.value,enabled:true};if(b.kind==='quota')b.plan=form.plan();
+      await api('POST',P()+'/jobs',b);render()}catch(e){flash(msg,e.message,1)}}}},t('addJob'));
+  el.replaceChildren(
+    sec(t('jobs'),list.length?tbl([t('name'),t('kind'),t('spec'),t('content'),t('enabled'),''].map(h=>$('th',{},h)),list.map(j=>$('tr',{},
+        $('td',{},j.name),$('td',{},t('kind.'+j.kind)),$('td',{className:'mono'},j.spec),
+        $('td',{className:'mute'},j.plan?desc(j.plan):''),
+        $('td',{},$('input',{type:'checkbox','aria-label':t('enabled')+': '+j.name,checked:j.enabled,on:{change:async e=>{const c=e.target;try{await api('PUT',P()+'/jobs/'+j.id,{...j,enabled:c.checked});lmsg.textContent=''}catch(x){c.checked=!c.checked;flash(lmsg,x.message,1)}}}})),
+        $('td',{},$('button',{className:'d',on:{click:async()=>{if(confirm(t('delJob',{n:j.name}))){await api('DELETE',P()+'/jobs/'+j.id);render()}}}},t('del')))))):empty(t('noJobs')),lmsg),
+    sec(t('addJob'),$('div',{className:'well'},$('div',{className:'row'},fld(t('jobName'),name),fld(t('kind'),kind),fld(t('cron'),spec)),
+      $('p',{className:'hint'},t('cronHint')),fw,
+      $('p',{className:'hint'},t('addWarn')),$('div',{className:'row mid'},add),msg)));
+},
+async runs(el){
+  const title=r=>r.title==='刷新统计'?t('kind.refresh'):r.title==='调整余额'?t('kind.quota'):r.title.startsWith('定时:')?t('sched')+r.title.slice(3):r.title;
+  const draw=async()=>{
+    const rs=await api('GET',P()+'/runs');
+    el.replaceChildren(sec(t('runs'),rs.length?tbl([t('time'),t('kind'),t('content'),t('from'),t('status'),t('okTotal')].map(h=>$('th',{},h)),
+      rs.map(r=>$('tr',{},$('td',{},fmtT(r.started_at)),$('td',{},t(r.kind==='quota'?'kind.quotaS':'kind.refreshS')),$('td',{},title(r)),$('td',{},r.by==='cron'?t('cronBy'):r.by),
+        $('td',{className:r.status==='ok'?'st-ok':r.status==='running'||r.status==='skipped'?'st-mute':'st-bad'},t('st.'+r.status)),
+        $('td',{className:'mono'},r.kind==='quota'?`${r.ok}/${r.total}`:'',r.errors?$('pre',{},r.errors):null)))):empty(t('noRuns'))));
+    return rs.some(r=>r.status==='running');
+  };
+  if(await draw())poll(async()=>{if(!await draw())clearInterval(timer)});
+},
+async audit(el){
+  let es=await api('GET','/api/audit');
+  const sum=e=>{const d=e.detail||{};switch(e.action){
+    case 'quota':return d.plan?desc(d.plan):'';
+    case 'refresh':return '#'+d.run_id;
+    case 'job.create':case 'job.update':return d.name+', '+t('kind.'+d.kind)+', '+d.spec+(d.plan?' · '+desc(d.plan):'');
+    case 'job.delete':return d.name;
+    case 'platform.create':case 'platform.update':return d.name+', '+d.base_url+(d.token_changed?' · '+t('tokenChanged'):'');
+    case 'platform.delete':return d.name;
+    case 'admin.create':case 'admin.update':return d.username+(d.root?' (root)':'')+(d.password_changed?' · '+t('pwChanged'):'');
+    case 'admin.delete':return d.username;
+    default:return ''}};
+  const draw=more=>el.replaceChildren(sec(t('audit'),$('p',{className:'hint'},t(S.me.root?'auditRoot':'auditOwn')),
+    es.length?tbl([t('time'),t('actor'),t('platform'),t('action'),t('detail')].map(h=>$('th',{},h)),
+      es.map(e=>$('tr',{},$('td',{},fmtT(e.at)),$('td',{},e.admin),$('td',{},e.platform||'-'),$('td',{},t('a.'+e.action)),$('td',{className:'mute'},sum(e))))):empty(t('noAudit')),
+    more?$('div',{className:'row mid',style:'margin-top:var(--space-sm)'},$('button',{on:{click:async()=>{try{const older=await api('GET','/api/audit?before='+es[es.length-1].id);es=es.concat(older);draw(older.length>=200)}catch(e){el.append(failBox(e))}}}},t('more'))):null));
+  draw(es.length>=200);
+},
+async platforms(el){
+  const rows=S.platforms.map(p=>{
+    const n=$('input',{'aria-label':t('name'),value:p.name}),u=$('input',{'aria-label':'URL',value:p.base_url}),tk=$('input',{'aria-label':'Token',placeholder:t('tokenKeep'),type:'password',autocomplete:'off'}),m=$('span',{className:'msg',role:'status'});
+    return $('tr',{},$('td',{},n),$('td',{},u),$('td',{},tk),$('td',{},$('div',{className:'acts'},
+      $('button',{on:{click:async()=>{try{await api('PUT','/api/platforms/'+p.id,{name:n.value,base_url:u.value,token:tk.value});flash(m,t('saved'));S.platforms=await api('GET','/api/platforms')}catch(e){flash(m,e.message,1)}}}},t('save')),
+      $('button',{className:'d',on:{click:async()=>{if(confirm(t('delPlat',{n:p.name}))){await api('DELETE','/api/platforms/'+p.id);boot()}}}},t('del')),m)));
+  });
+  const n=$('input',{name:'name'}),u=$('input',{name:'url',placeholder:'https://example.com'}),tk=$('input',{name:'token',placeholder:'nap_…',type:'password',autocomplete:'off'}),m=$('div',{className:'msg',role:'status'});
+  el.replaceChildren(
+    sec(t('platforms'),rows.length?tbl([t('name'),'URL','Token',''].map(h=>$('th',{},h)),rows):empty(t('noPlats'))),
+    sec(t('addPlatH'),$('div',{className:'well'},$('p',{className:'hint'},t('patHint')),
+      $('div',{className:'row'},fld(t('name'),n),fld('URL',u),fld('Token (PAT)',tk),$('button',{className:'p',on:{click:async()=>{try{await api('POST','/api/platforms',{name:n.value,base_url:u.value,token:tk.value});boot()}catch(e){flash(m,e.message,1)}}}},t('add'))),m)));
+},
+async admins(el){
+  const as=await api('GET','/api/admins');
+  const row=a=>{
+    const pw=$('input',{'aria-label':t('pass'),type:'password',autocomplete:'new-password',placeholder:a?t('pwKeep'):t('pwNew')}),un=$('input',{'aria-label':t('user'),value:a?.username??'',disabled:!!a}),root=$('input',{type:'checkbox','aria-label':'root',checked:!!a?.root}),m=$('span',{className:'msg',role:'status'});
+    const checks=S.platforms.map(p=>[p,$('input',{type:'checkbox',checked:!!a?.platform_ids.includes(p.id)})]);
+    const save=async()=>{try{await api(a?'PUT':'POST','/api/admins'+(a?'/'+a.id:''),{username:un.value,password:pw.value,root:root.checked,platform_ids:checks.filter(([,c])=>c.checked).map(([p])=>p.id)});a?flash(m,t('saved')):render()}catch(e){flash(m,e.message,1)}};
+    return $('tr',{},$('td',{},un),$('td',{},pw),$('td',{},root),$('td',{},checks.map(([p,c])=>$('label',{className:'chk'},c,p.name))),
+      $('td',{},$('div',{className:'acts'},$('button',{className:a?'':'p',on:{click:save}},a?t('save'):t('create')),a?$('button',{className:'d',on:{click:async()=>{if(confirm(t('delAdmin',{n:a.username}))){try{await api('DELETE','/api/admins/'+a.id);render()}catch(e){flash(m,e.message,1)}}}}},t('del')):null,m)));
+  };
+  el.replaceChildren(sec(t('admins'),$('p',{className:'hint'},t('adminHint')),
+    tbl([t('user'),t('pass'),'root',t('adminPlats'),''].map(h=>$('th',{},h)),[...as.map(row),row(null)])));
+}};
+
+function quotaForm(init){
+  const mode=$('select',{},['add','subtract','override'].map(v=>$('option',{value:v},t('mode.'+v))));
+  const amount=$('input',{name:'amount',type:'number',step:'any',min:'0',inputMode:'decimal'});
+  const unit=$('select',{},$('option',{value:'usd'},t('unitUsdL')),$('option',{value:'quota'},t('unitQuotaL')));
+  const target=$('select',{},$('option',{value:'group'},t('tgtGroup')),$('option',{value:'users'},t('tgtUsers')));
+  const val=$('input',{name:'target',value:init.user||''}),vl=$('span',{className:'lbl'});
+  if(init.user)target.value='users';
+  const sync=()=>vl.textContent=target.value==='group'?t('groupName'):t('userIds');target.addEventListener('change',sync);sync();
+  return{el:$('div',{className:'row'},fld(t('op'),mode),fld(t('amount'),amount),fld(t('unit'),unit),fld(t('target'),target),$('label',{className:'f'},vl,val)),plan(){
+    const a=parseFloat(amount.value);if(!(a>=0))throw new Error(t('eAmount'));
+    const base={mode:mode.value,amount:a,unit:unit.value};
+    if(target.value==='group'){if(!val.value.trim())throw new Error(t('eGroup'));return{...base,group:val.value.trim()}}
+    const ids=val.value.split(/[,\s]+/).filter(Boolean).map(Number);if(!ids.length||ids.some(n=>!Number.isInteger(n)||n<=0))throw new Error(t('eIds'));
+    return{...base,user_ids:ids}}};
+}
+document.documentElement.lang=S.lang==='zh'?'zh-CN':'en';document.title=t('app');
+boot();
+</script>
+</body>
+</html>
