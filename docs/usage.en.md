@@ -1,0 +1,141 @@
+# User guide
+
+**English** | [中文](usage.md)
+
+This guide covers day-to-day use of napm. For installation and the first start, see the [README](../README.en.md).
+
+The web interface is available in Chinese and English. Use the language button in the top bar to switch; the choice is kept in the browser. On first visit the page follows the browser language. This guide uses the English labels.
+
+## Prepare an access token
+
+napm reads users and changes balances through the target site's admin API, so each platform needs a personal access token (PAT).
+
+Prerequisites:
+
+- The target site runs new-api v1.0.0-rc.41 or newer.
+- You can log in to the target site as an administrator.
+
+Steps:
+
+1. Log in to the target site and open the security settings ("安全设置").
+2. Create an access token with the three permissions `user:read`, `user:write` and `group:read`. The token starts with `nap_`.
+3. Copy the token. The target site shows it only when you create it.
+
+You can create an access token only by hand on the target site, not with another access token. The account that owns the token must be an administrator of the target site.
+
+## Add a platform
+
+Only root administrators can add, edit and delete platforms.
+
+1. Open **Platforms**.
+2. Enter a name, a URL and the token, then click **Add**. The URL starts with `http://` or `https://` and must not contain a user name or password.
+3. After you save, napm no longer shows the token. When you edit a platform, leave the token empty to keep the stored one.
+
+Deleting a platform also deletes its statistics, scheduled jobs, run records and administrator grants.
+
+## Manage administrators
+
+Only root administrators can manage administrator accounts.
+
+1. Open **Admins**.
+2. In the last row, enter a user name and a password (at least 8 characters), tick the platforms the administrator may manage, and click **Add**.
+3. A non-root administrator sees only the ticked platforms after logging in.
+4. Ticking "root" makes the account a root administrator, who can manage all platforms and all administrators.
+
+After you change an administrator's password or permissions, that administrator's logged-in sessions end at once and the administrator must log in again. A root administrator cannot remove their own root permission or delete their own account.
+
+## View statistics
+
+The **Stats** page shows the result of the latest refresh: the number of users, total balance, total usage and request count, and the same four values for each group. Amounts are shown in USD, converted with the target site's `quota_per_unit`.
+
+Clicking **Refresh stats** reads all users on the target site and totals them again. A refresh takes a while when there are many users, because napm waits at least 600 ms between requests to one platform and reads 100 users per page. While the refresh runs, the button reads **Refreshing…**, and the page updates when it finishes.
+
+The **Users** page lists the target site's users page by page. You can filter by keyword (user name, email or ID) and by group. This page shows balances as raw quota.
+
+## Change balances
+
+1. Open **Adjust balance**.
+2. Choose a mode:
+   - Add: add the amount to the current balance.
+   - Subtract: subtract the amount from the current balance.
+   - Set: set the balance to the amount, whatever the balance was before.
+3. Enter the amount and choose the unit. **USD** converts the amount to quota with the target site's `quota_per_unit`. **Raw quota** uses the number as entered.
+4. Choose the target: **Whole group** with a group name, or **Specific user IDs** with comma-separated user IDs. An ID written more than once is handled once.
+5. Click **Run** and confirm the dialog.
+
+The change runs in the background and the page returns at once. Open **Runs** to see progress and the result.
+
+napm changes users one at a time. When a user fails, napm records the reason and continues with the other users. The following cases fail a single user and leave the others unaffected:
+
+- A subtraction is larger than the user's balance at the start of the run. new-api itself allows a negative balance; napm does not.
+- The balance after an addition would exceed new-api's balance ceiling (2^53 − 1).
+- The target site rejects the request, or the given user does not exist.
+
+If the amount itself exceeds the balance ceiling, the whole run fails and no user is changed.
+
+napm never retries a failed change automatically.
+
+## Schedule jobs
+
+1. Open **Schedules**.
+2. Enter a job name and choose the type: **Refresh stats** or **Adjust balance**.
+3. Enter the schedule. Two forms are accepted:
+   - A 5-field cron expression in the order minute, hour, day of month, month, day of week. For example, `0 3 * * *` runs every day at 03:00.
+   - A predefined form such as `@every <interval>` or `@daily`. For example, `@every 6h` runs every 6 hours.
+4. For the type **Adjust balance**, also enter the mode, amount, unit and target. The rules are the same as for an immediate change.
+5. Click **Add job**.
+
+Times follow the local time zone of the machine that runs napm. Tick or clear the **Enabled** box in a job's row to enable or disable the job.
+
+Only one job runs per platform at a time. If a scheduled job fires while the platform already has a job running, napm does not run it and records an entry with the status `skipped`.
+
+### A scheduled "add" is not idempotent
+
+new-api's adjust endpoint has no de-duplication, and napm does not keep a ledger of past changes. A scheduled "add" therefore adds again every time it fires. To bring a balance back to a fixed value, use "set".
+
+## View run records
+
+The **Runs** page lists the last 50 runs of the platform. Each entry shows the start time, type, content, source, status and **OK / total**. The source is the user name of the administrator who triggered the run, or `cron` (shown as **scheduler** in the English interface). Error messages stored with a run are in Chinese in both languages, because the server writes them when the run happens.
+
+The [reference](reference.en.md#run-statuses) describes each status. When a run has failed users, the entry shows up to 50 errors below it, each with the user name, user ID and reason.
+
+## View the audit log
+
+The **Audit log** page lists actions, newest first, 200 at a time. Click **Load older entries** to go further back. Root sees the actions of every administrator; other administrators see only their own. Each entry has the time, administrator, platform, action and details.
+
+Recorded actions: signing in, refreshing stats, adjusting balances, adding, changing or deleting a job, adding, changing or deleting a platform, and adding, changing or deleting an administrator. The details say what changed. They never contain a token or a password. Failed logins are not recorded.
+
+Runs fired by a scheduled job are not here; see the **Runs** page, where the source is `cron`. The person who created or changed the job appears here.
+
+Entries stay after an administrator or platform is deleted. Only root can see the entries of a deleted administrator; an account later created with the same name cannot. They are not pruned automatically. To remove old ones, delete rows from the `audit` table in the database.
+
+## Troubleshooting
+
+### A refresh fails after you add a platform
+
+The error in the run record gives the cause:
+
+| Error message | Cause and fix |
+| --- | --- |
+| `HTTP 401` or `HTTP 403` | The token is invalid, deleted, or lacks a permission. Create a new token on the target site with all three permissions, then update the token under **Platforms** in napm. |
+| `unexpected response (is the URL a new-api site?)` | The URL does not point to a new-api site, or points to the site's front end instead of its API. Check the URL and enter only the site's root address. |
+| `HTTP 429` | The target site's rate limit was hit. For reads, napm waits for the `Retry-After` time and retries up to 3 times. If it still fails, raise the request gap with `--interval` and restart. |
+| Connection timeout or refused | The machine running napm cannot reach the URL. On that machine, run `curl <URL>/api/status` to check. |
+
+### You cannot log in
+
+After 5 failed logins, the client IP and the user name are each locked for 1 minute, and napm returns HTTP 429. Wait 1 minute and try again.
+
+### You must log in again after a restart
+
+Sessions are kept in memory. Restarting napm logs everyone out.
+
+### A balance run has the status `interrupted`
+
+napm was stopped in the middle of the run, for example because the process was killed or the container restarted. The "succeeded/total" count in the record is a lower bound: at the moment napm stopped, the last user may already have been changed but not yet counted. The record also does not store which users were handled.
+
+To recover:
+
+1. Check the balances of the affected users on the target site.
+2. If the mode was "set", run it again. The result is the same.
+3. If the mode was "add" or "subtract", do not rerun the whole batch, or users that were already handled are changed a second time. Rerun only for the users that were not handled.

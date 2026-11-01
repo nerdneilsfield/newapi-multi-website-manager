@@ -1,42 +1,75 @@
-# go-template
+# napm
 
-My Go CLI project template: cobra, zap, golangci-lint v2, GoReleaser v2, GitHub Actions and a distroless Docker image.
+[English](README.en.md) | **中文**
 
-## Layout
+napm 在一个网页里管理多个 [new-api](https://github.com/QuantumNous/new-api) 站点，面向同时运营多个 new-api 的管理员。它汇总各站点的用户数、分组、余额和用量，调整指定用户或整个分组的余额，并按计划定时执行这些操作。
 
+## 特点
+
+- 一个 Go 二进制，网页内嵌，数据存放在一个 SQLite 文件中，不依赖 CGO 和外部数据库。
+- 每位管理员只能看到并操作被授权的平台。
+- 余额可以增加、扣减或设为固定值，金额可以按美元或原始额度输入。
+- 定时任务支持刷新统计和调整余额两种，使用 cron 表达式或 `@every` 间隔。
+- 对同一平台一次只运行一个任务，并限制请求间隔，避免触发 new-api 的限流。
+
+## 状态与限制
+
+napm 尚未对真实的 new-api 站点做过验证，请先在测试站点上试用。
+
+- 目标站点需要运行 new-api v1.0.0-rc.41 或更新版本。更早的版本没有个人访问令牌，也没有调整余额的接口。
+- napm 只提供明文 HTTP，没有 TLS。详见[部署与安全](docs/deploy.md)。
+- 平台令牌以明文存放在 SQLite 文件中。
+
+## 安装
+
+需要 Go 1.27.1 或更新版本。
+
+```bash
+go install github.com/nerdneilsfield/newapi-multi-website-manager@latest
 ```
-main.go                 signal handling, calls cmd.Execute
-cmd/                    cobra commands
-internal/buildinfo/     version, commit and date injected with -ldflags
-internal/logging/       zap logger writing to stderr
+
+这条命令安装的可执行文件名为 `newapi-multi-website-manager`。如果要得到名为 `napm` 的文件，从源码构建：
+
+```bash
+git clone https://github.com/nerdneilsfield/newapi-multi-website-manager.git
+cd newapi-multi-website-manager
+make install
 ```
 
-## Starting a new project
+`make install` 把 `napm` 放入 `GOBIN`，未设置 `GOBIN` 时放入 `$(go env GOPATH)/bin`。也可以用 [Docker](docs/deploy.md#用-docker-运行) 运行。
 
-1. Replace `github.com/nerdneilsfield/go-template` and `go-template` everywhere with the new module path and binary name.
-2. Run `go mod tidy`.
-3. Run `make check`.
+## 快速开始
 
-## Commands
+1. 在环境变量中设置初始 root 管理员的密码（至少 8 个字符），然后启动：
 
-`make` and `just` provide the same targets:
+   ```bash
+   NAPM_ADMIN_PASSWORD=<密码> napm serve --db napm.db
+   ```
 
-| Target | Description |
-| --- | --- |
-| `build` | Build the binary with version info |
-| `hooks` | Install the Git hooks |
-| `test` | Run tests with coverage |
-| `fmt` / `fmt-check` | Format with gofumpt and goimports (via `go tool`) |
-| `lint` | Run golangci-lint |
-| `check` | fmt-check, lint, vet, test and `goreleaser check` |
-| `release-test` | Build a local snapshot release |
+   终端输出一行 `listening`，其中 `addr` 为 `127.0.0.1:8080`。
 
-golangci-lint and goreleaser are installed separately. gofumpt, goimports and lefthook are `tool` dependencies in `go.mod`.
+2. 在浏览器中打开 `http://127.0.0.1:8080`，以用户名 `admin` 和上一步的密码登录。
+3. 打开「平台管理」，填写名称、目标站点的 URL 和访问令牌，点击「添加」。令牌的创建方法见[准备访问令牌](docs/usage.md#准备访问令牌)。
+4. 回到「统计」，点击「刷新统计」。刷新完成后，页面显示用户数、总余额、总用量、请求数和分组明细。
 
-The Git hooks check staged Go files with gofumpt and goimports, and check `go.mod`/`go.sum` with `go mod tidy -diff` when either file is staged. The commit-msg hook accepts Conventional Commit messages and allows Git merge and revert messages.
+## 文档
 
-## Release
+- [使用手册](docs/usage.md)：创建令牌、授权管理员、调整余额、设置定时任务、排查问题。
+- [参考](docs/reference.md)：命令行参数、环境变量、HTTP 接口、状态值和限制。
+- [部署与安全](docs/deploy.md)：监听地址、反向代理、Docker、备份和安全边界。
 
-Push a `v*` tag. The release workflow runs GoReleaser, publishes binaries and Docker images to GHCR and Docker Hub, and attests the binaries and images.
+## 开发
 
-The workflow needs the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. Without them the Docker Hub login step fails and nothing is released. To publish only to GHCR, remove the Docker Hub login step and the `nerdneils/go-template` image from `.goreleaser.yml`.
+```bash
+make check
+```
+
+`make check` 依次运行格式检查、lint、`go vet`、测试和 `goreleaser check`。`just` 提供同名目标。golangci-lint 和 goreleaser 需要另行安装；gofumpt、goimports 和 lefthook 是 `go.mod` 中的 `tool` 依赖。
+
+Git 钩子检查暂存的 Go 文件格式，并要求提交信息符合 Conventional Commits。
+
+发布时推送 `v*` 标签，由 GoReleaser 构建二进制和镜像。发布流程需要仓库密钥 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`。只发布到 GHCR 时，删除 Docker Hub 登录步骤和 `.goreleaser.yml` 中的 `nerdneils/napm` 镜像。
+
+## 许可证
+
+本项目使用 MIT 许可证，见 [LICENSE](LICENSE)。
