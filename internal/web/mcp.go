@@ -71,6 +71,22 @@ type auditArg struct {
 	Before int64 `json:"before,omitempty" jsonschema:"上一页最后一条的 id，返回比它更早的记录"`
 }
 
+// usageGuide is the get_usage description. napm computes nothing here: it returns stored rows and tells the
+// model what to work out from them, the same set the Usage page shows. Keep its thresholds and windows in step
+// with analyze() in index.html (between `// <analysis>` and `// </analysis>`).
+const usageGuide = `读取已采集的用量行，不做任何分析；分析由你完成。
+返回 {state, from, to, step, models, users}。models 每行是 {t, model, count, quota, tokens}，users 每行是 {t, username, count, quota, tokens}。t 是桶的起点(Unix 秒)，count 是请求数，quota 是 new-api 原始额度，除以 state.quota_per_unit 得金额。state 为 null 表示还没采集过，先用 collect_usage 并用 list_runs 等它完成；state.collected_to 之后没有数据。
+
+回答「花得怎么样、谁在用、有没有异常」时，先取 step=day，tz 用用户所在时区的分钟数(东八区是 480)。from 必须是用户时区里今天零点往前 2N 天的那个零点(不是「当前时间减 2N 天」，否则最早一天只有半天数据，上期会被低估)，to 取当前时间；这样最近 N 个完整日是今天零点往前 N 天到今天零点，上期是再往前 N 天。今天还没过完，不要把它算进对比。再按下面的方法算：
+1. 对比：把最近 N 个完整日的 quota 之和，与再前 N 日的和比较，给出涨跌百分比；上期为 0 时只说明没有可比数据，不要除零。
+2. 月度推算：最近 7 个完整日的日均乘 30。
+3. 异常日：对最近 N 个完整日的 quota 取中位数 m 和各日与 m 的绝对偏差的中位数 d，离散度 s = max(1.4826*d, 0.25*m)；日值 > m+3*s 的日子算异常。m 为 0 或不足 7 天时不判断。
+4. 集中度：按 model 或 username 汇总 quota，算占比；单个用户 >= 30% 或单个模型 >= 50% 值得点出，并给前 3 名合计占比。
+5. 涨跌：按 username 分别汇总本期与上期 quota，找涨幅和跌幅最大的，只在变化量超过上期总额 10% 时才提；统计本期出现而上期没有、上期有而本期没有的用户数。
+6. 一天内的分布：只在需要时再取 step=hour，from 取今天本地零点往前 min(N,13) 天，to 取今天本地零点，按本地小时累加 count 得到 24 个值；至少 12 个小时非零才判断，找总和最小的连续 4 小时(可绕过午夜；适合停机或批量调额)和最忙的一小时。
+7. 周末：最近 N 个完整日里，周六日至少 2 天、工作日至少 5 天时，算周末日均与工作日日均之比；低于 0.75 或高于 1.33 才提。
+结论里每一条都带数字和对应的时间范围；数据不足以支持的条目不要写。`
+
 type usageArg struct {
 	PlatformID int64  `json:"platform_id" jsonschema:"平台 ID，来自 list_platforms"`
 	From       int64  `json:"from,omitempty" jsonschema:"起点，Unix 秒；默认 30 天前"`
@@ -145,7 +161,7 @@ func (s *Server) mcpHandler(rest http.Handler) http.Handler {
 		func(ctx context.Context, _ *mcp.CallToolRequest, a quotaArg) (*mcp.CallToolResult, any, error) {
 			return call(ctx, "POST", pid(a.PlatformID)+"/quota", nil, a.planArg)
 		})
-	mcp.AddTool(srv, tool("get_usage", "读取已采集的用量：按模型和按用户、按天或按小时的请求数、额度(new-api 原始单位，除以 state.quota_per_unit 得金额)和 token 数。数据来自 collect_usage 的定时采集，state.collected_to 是已采集到的时间。趋势、排行、峰值、集中度等分析请自行基于这些行计算。"),
+	mcp.AddTool(srv, tool("get_usage", usageGuide),
 		func(ctx context.Context, _ *mcp.CallToolRequest, a usageArg) (*mcp.CallToolResult, any, error) {
 			q := url.Values{}
 			for k, v := range map[string]int64{"from": a.From, "to": a.To, "tz": int64(a.TZ)} {

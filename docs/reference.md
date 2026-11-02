@@ -258,7 +258,7 @@ napm 在 `POST /mcp` 提供一个 [MCP](https://modelcontextprotocol.io) 服务�
 | `refresh_stats` | 开始刷新统计，立即返回 `run_id`。 | `POST /api/platforms/{id}/refresh` |
 | `list_users` | 分页列出平台用户，可按 `group`、`keyword` 过滤。 | `GET /api/platforms/{id}/users` |
 | `adjust_quota` | 修改某些用户或整个分组的余额，立即返回 `run_id`。 | `POST /api/platforms/{id}/quota` |
-| `get_usage` | 读取已采集的用量行（按模型、按用户，按天或按小时）。趋势、排行、异常等分析由调用方自己基于这些行计算。 | `GET /api/platforms/{id}/usage` |
+| `get_usage` | 读取已采集的用量行（按模型、按用户，按天或按小时）。napm 不做分析。工具说明里写明了要算什么和阈值（环比、月度推算、异常日、集中度、涨跌、安静时段、周末比），与「用量」页一致，由调用方的模型照着算。 | `GET /api/platforms/{id}/usage` |
 | `collect_usage` | 开始采集平台用量，立即返回 `run_id`。 | `POST /api/platforms/{id}/usage/collect` |
 | `list_runs` | 列出最近 50 次执行。 | `GET /api/platforms/{id}/runs` |
 | `list_jobs`、`create_job`、`update_job`、`delete_job` | 管理定时任务。 | `/api/platforms/{id}/jobs` |

@@ -285,6 +285,8 @@ const empty=(msg,btn)=>$('div',{className:'empty'},$('p',{},msg),btn);
 const failBox=(e,retry)=>$('div',{className:'fail',role:'alert'},e.message,retry?$('button',{on:{click:retry}},t('retry')):null);
 
 // <analysis>
+// The get_usage description in internal/web/mcp.go (usageGuide) tells an AI to compute the same things with the
+// same thresholds. Change one, change the other.
 // Everything on the usage page is computed here, in the browser, from the rows the server stores.
 // day: the /usage answer by day (the n complete days before today and the n before those, plus today);
 // hours: its answer by hour. today is the local midnight of today and off the zone's seconds east of UTC.

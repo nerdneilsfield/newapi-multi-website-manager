@@ -258,7 +258,7 @@ Each tool calls the HTTP endpoint in the table below inside the process, with th
 | `refresh_stats` | Starts a refresh and returns a `run_id` at once. | `POST /api/platforms/{id}/refresh` |
 | `list_users` | Lists the platform's users page by page; filter by `group` or `keyword`. | `GET /api/platforms/{id}/users` |
 | `adjust_quota` | Changes the balance of some users or of a whole group and returns a `run_id` at once. | `POST /api/platforms/{id}/quota` |
-| `get_usage` | Reads the collected usage rows (per model and per user, by day or by hour). Trends, rankings and anomalies are for the caller to compute from these rows. | `GET /api/platforms/{id}/usage` |
+| `get_usage` | Reads the collected usage rows (per model and per user, by day or by hour). napm does no analysis. The tool description says what to compute and with which thresholds (period change, monthly run rate, unusual days, concentration, movers, quiet hours, weekend ratio), the same as the Usage page, for the caller's model to follow. | `GET /api/platforms/{id}/usage` |
 | `collect_usage` | Starts collecting the platform's usage and returns a `run_id` at once. | `POST /api/platforms/{id}/usage/collect` |
 | `list_runs` | Lists the last 50 runs. | `GET /api/platforms/{id}/runs` |
 | `list_jobs`, `create_job`, `update_job`, `delete_job` | Manage scheduled jobs. | `/api/platforms/{id}/jobs` |
