@@ -13,14 +13,15 @@ Read these points before you deploy. They decide which networks napm can sit in.
 - An access token has the `user:write` permission. Its holder can change the balance of any user on the target site.
 - Sessions are kept in memory, and napm is designed to run as a single instance. Do not run several napm processes on the same database.
 - napm does not restrict the platform addresses you can add, including private addresses, because a self-hosted new-api usually sits on an internal network. Only root administrators can add platforms, so give root only to people you trust.
-- napm has no audit log. A run record stores the time, source, status and errors, but not each user's balance before and after the change.
+- The audit log records who did what and when, but not each user's balance before and after a change. A run record stores only the time, source, status and errors.
+- An API token (used for MCP) has the same permissions as the administrator it belongs to, and a root token can change balances on every platform. napm stores the token in plaintext, protected by the `0600` mode of the database file, and root can see every administrator's token on the web page. A token never expires, so after a leak you must regenerate or delete it on the web page. A token travels in the `Authorization` header in plaintext, so `/mcp` must sit behind TLS as well.
 
 Protections napm provides:
 
 | Threat | Measure |
 | --- | --- |
 | Password guessing | 5 consecutive failures from one client IP or for one user name lock each for 1 minute. |
-| Cross-site requests | A state-changing request must be JSON and pass an `Origin` check. The session cookie has `SameSite=Strict`. |
+| Cross-site requests | A state-changing request must be JSON and pass Go's standard `http.CrossOriginProtection` check (`Sec-Fetch-Site`, or `Origin` compared with `Host`). The session cookie has `SameSite=Strict`. |
 | Token sent to another host | napm does not follow redirects from a target site. |
 | Privilege escalation | A non-root administrator who requests a platform they are not granted gets `403`. |
 | Clickjacking and content sniffing | Responses carry `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`. |
@@ -88,7 +89,7 @@ napm.example.com {
 }
 ```
 
-The reverse proxy must keep the `Host` header and forward the browser's `Origin` header unchanged. napm compares the host in `Origin` with `Host` and rejects a state-changing request when they differ.
+The reverse proxy must keep the `Host` header and forward the browser's `Origin` header unchanged. When the browser sends no `Sec-Fetch-Site`, napm compares the host in `Origin` with `Host` and rejects a state-changing request when they differ.
 
 ## Run with Docker
 
@@ -139,4 +140,4 @@ To restore, stop napm, replace the database file with the backup, delete the old
 2. Back up the database.
 3. Replace the binary or the image, then start napm.
 
-At start-up, napm creates any missing tables but has no database migration mechanism and never alters an existing table. Before you upgrade, read the new version's GitHub release notes to confirm that no table has changed.
+At start-up, napm brings the database up to the current version with [goose](https://github.com/pressly/goose) and keeps the existing data. The version is recorded in the table `goose_db_version`. A migration cannot be rolled back, so the backup you took before upgrading is the only way back.

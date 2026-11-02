@@ -80,8 +80,8 @@ napm 接受 `robfig/cron` 的标准写法，表达式不含秒字段：
 ### 通用规则
 
 - 请求和响应的正文都是 JSON。请求正文不得超过 1 MiB。
-- 除 `POST /api/login` 外，接口要求登录会话。会话 Cookie 名为 `napm_session`，有效期 7 天，属性为 `HttpOnly` 和 `SameSite=Strict`；请求通过 HTTPS 到达 napm 时才带 `Secure`。
-- 状态变更请求（非 `GET`）要求 `Content-Type: application/json`，且请求若带 `Origin` 头，其主机必须与 `Host` 相同，否则返回 `415` 或 `403`。
+- 除 `POST /api/login` 外，接口要求登录会话或 API 令牌。会话 Cookie 名为 `napm_session`，有效期 7 天，属性为 `HttpOnly` 和 `SameSite=Strict`；请求通过 HTTPS 到达 napm 时才带 `Secure`。API 令牌放在请求头 `Authorization: Bearer <令牌>` 里，见[API 令牌](#api-令牌)。请求带了 `Authorization` 头时只认令牌，令牌无效返回 `401`，不会退回去看 Cookie。
+- 用会话的状态变更请求（非 `GET`）要求 `Content-Type: application/json`，且不能是跨源请求，否则返回 `415` 或 `403`。跨源由 Go 标准库的 `http.CrossOriginProtection` 判断：先看 `Sec-Fetch-Site`，浏览器没有发这个头时，再要求 `Origin` 的主机与 `Host` 相同。用令牌的请求不做这两项检查，因为令牌不会被浏览器自动带上。
 - 失败时返回对应的 HTTP 状态码和 `{"error": "<原因>"}`。
 - 带 `{id}` 的平台接口要求当前管理员被授权该平台，否则返回 `403`。
 
@@ -183,8 +183,25 @@ napm 接受 `robfig/cron` 的标准写法，表达式不含秒字段：
 | `platform.delete` | 删除平台 | `name` |
 | `admin.create`、`admin.update` | 新增、修改管理员 | `username`、`root`、`platform_ids`，修改时另有 `password_changed`。不含密码。 |
 | `admin.delete` | 删除管理员 | `username` |
+| `token.create`、`token.delete` | 创建、删除 API 令牌 | `name` |
 
 只有人通过网页或接口做的操作会记录。定时任务自己触发的执行不进操作记录，它们在执行记录里，来源为 `cron`。
+
+### API 令牌
+
+令牌让 MCP 客户端或脚本以某位管理员的身份调用 HTTP 接口。令牌的权限与该管理员完全相同：能访问哪些平台、是不是 root，都取决于管理员当前的设置，改了立即生效。
+
+每个管理员最多有一个令牌。管理员可以给自己生成，root 也可以替任何管理员生成，root 能直接读到任何管理员的令牌，管理员只能读自己的。重新生成会替换旧令牌，旧令牌立即失效。令牌以 `napm_` 开头，后接 64 个十六进制字符，没有过期时间。napm 以明文保存令牌，和平台的访问令牌一样靠数据库文件的 `0600` 权限保护。管理员被删除、或管理员的密码被修改时，令牌随之删除。
+
+下面三个令牌接口，以及新增、修改、删除管理员的 `POST /api/admins`、`PUT /api/admins/{id}`、`DELETE /api/admins/{id}`，只接受会话，用令牌调用返回 `403`。否则泄露的 root 令牌可以新建一个密码自己定的 root 管理员，或者换掉自己的令牌，删除原令牌也就挡不住它了。`GET /api/admins` 仍可用令牌读取，它只返回 `has_token`，不返回令牌本身。
+
+| 方法与路径 | 说明 |
+| --- | --- |
+| `GET /api/admins/{id}/token` | 返回 `{"token"}`，没有令牌时为空字符串。自己的，或 root 读任何人的；别人的返回 `403`，管理员不存在返回 `404`。 |
+| `POST /api/admins/{id}/token` | 生成新令牌并返回 `{"token"}`，已有的令牌作废。权限同上。 |
+| `DELETE /api/admins/{id}/token` | 删除令牌，立即失效。权限同上。 |
+
+生成和删除令牌会记入操作记录，动作为 `token.create` 和 `token.delete`，详情只含管理员的用户名。操作人是执行的人，所以 root 替别人生成时，记录里是 root。
 
 ### 管理员
 
@@ -192,10 +209,57 @@ napm 接受 `robfig/cron` 的标准写法，表达式不含秒字段：
 
 | 方法与路径 | 说明 |
 | --- | --- |
-| `GET /api/admins` | 列出管理员，每项含 `id`、`username`、`root`、`platform_ids`。 |
+| `GET /api/admins` | 列出管理员，每项含 `id`、`username`、`root`、`platform_ids`、`has_token`。 |
 | `POST /api/admins` | 新增。请求 `{"username", "password", "root", "platform_ids"}`。密码少于 8 个字符返回 `400`。 |
 | `PUT /api/admins/{id}` | 修改。`password` 为空表示不改密码。修改密码或权限会使该管理员的会话失效。 |
 | `DELETE /api/admins/{id}` | 删除。不能删除自己。 |
+
+## MCP 接口
+
+napm 在 `POST /mcp` 提供一个 [MCP](https://modelcontextprotocol.io) 服务，让 AI 客户端用工具管理平台。
+
+### 连接方式
+
+- 地址：`http(s)://<napm 地址>/mcp`。
+- 认证：请求头 `Authorization: Bearer <API 令牌>`。只认令牌，不认会话 Cookie，所以浏览器里打开的页面无法驱动它。没有令牌或令牌无效返回 `401`。
+- 实现：napm 使用官方 Go SDK [`modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk) 的 Streamable HTTP 处理器，协议版本、请求头校验和错误码都由它负责。
+- 传输：无状态模式。每个 `POST` 是一次独立的请求，napm 用一个 JSON 正文回答，不使用 `Mcp-Session-Id`。请求要带 `Content-Type: application/json`，`Accept` 要同时包含 `application/json` 和 `text/event-stream`，这是 SDK 的要求。无状态模式下 `GET /mcp` 和 `DELETE /mcp` 返回 `405`，napm 不推送服务端消息。
+- 能力：只有工具，没有资源和提示。
+
+### 工具
+
+每个工具在进程内调用上表对应的 HTTP 接口，用的是调用者自己的令牌。所以授权检查、参数校验和操作记录与网页一致：成功的写操作会记录，读取和失败的请求不记录。工具的参数名与接口的 JSON 字段相同，`platform_id` 对应路径里的平台 `{id}`，`job_id` 对应任务 ID。
+
+| 工具 | 作用 | 对应的 HTTP 接口 |
+| --- | --- | --- |
+| `list_platforms` | 列出你可管理的平台。 | `GET /api/platforms` |
+| `get_stats` | 读取最近一次刷新得到的统计和最近一次执行。 | `GET /api/platforms/{id}/stats` |
+| `refresh_stats` | 开始刷新统计，立即返回 `run_id`。 | `POST /api/platforms/{id}/refresh` |
+| `list_users` | 分页列出平台用户，可按 `group`、`keyword` 过滤。 | `GET /api/platforms/{id}/users` |
+| `adjust_quota` | 修改某些用户或整个分组的余额，立即返回 `run_id`。 | `POST /api/platforms/{id}/quota` |
+| `list_runs` | 列出最近 50 次执行。 | `GET /api/platforms/{id}/runs` |
+| `list_jobs`、`create_job`、`update_job`、`delete_job` | 管理定时任务。 | `/api/platforms/{id}/jobs` |
+| `list_audit` | 读取操作记录，可用 `before` 翻页。 | `GET /api/audit` |
+
+工具失败时，napm 返回正常的 JSON-RPC 结果，其中 `isError` 为 `true`，文本是接口返回的 `{"error": "..."}`，客户端和模型可以据此修正参数。错误信息是中文。
+
+`adjust_quota` 会真实修改目标站点上的余额。`add` 和 `subtract` 不是幂等的，客户端重试会重复生效，需要幂等时用 `override`。
+
+### 客户端配置示例
+
+在网页的「令牌」页创建令牌，页面会同时给出配置。支持 HTTP 传输和自定义请求头的客户端，配置的形式如下：
+
+```json
+{
+  "mcpServers": {
+    "napm": {
+      "type": "http",
+      "url": "https://napm.example.com/mcp",
+      "headers": { "Authorization": "Bearer napm_<令牌>" }
+    }
+  }
+}
+```
 
 ## 限制
 
@@ -216,7 +280,7 @@ SQLite 数据库包含下列表：
 
 | 表 | 内容 |
 | --- | --- |
-| `admins` | 管理员，密码以 bcrypt 哈希保存。 |
+| `admins` | 管理员。密码以 bcrypt 哈希保存，API 令牌明文保存。 |
 | `platforms` | 平台，令牌以明文保存。 |
 | `admin_platforms` | 管理员与平台的授权关系。 |
 | `snapshots` | 每个平台最近一次统计快照。 |
@@ -224,4 +288,4 @@ SQLite 数据库包含下列表：
 | `runs` | 执行记录。 |
 | `audit` | 操作记录。不随平台或管理员的删除而删除，也不会自动清理。 |
 
-删除平台或管理员时，相关的授权、快照、任务和执行记录一并删除，操作记录保留。
+删除平台或管理员时，相关的授权、快照、任务和执行记录一并删除，操作记录保留。删除管理员时，他的 API 令牌随之删除。

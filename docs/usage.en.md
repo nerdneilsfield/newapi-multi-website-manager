@@ -99,11 +99,25 @@ The **Runs** page lists the last 50 runs of the platform. Each entry shows the s
 
 The [reference](reference.en.md#run-statuses) describes each status. When a run has failed users, the entry shows up to 50 errors below it, each with the user name, user ID and reason.
 
+## Connect an AI client with MCP
+
+napm offers an MCP endpoint, so an AI client can read statistics, change balances and manage scheduled jobs as you.
+
+1. Log in to the web page, open **Tokens** and click **Generate token**. Root can also generate one for any administrator on the **Admins** page.
+2. Click **Show** to see the full token and a client configuration, and **Copy** to copy the token.
+3. Put the configuration into an MCP client that supports HTTP transport and custom headers. The URL is `<napm address>/mcp` and the header is `Authorization: Bearer <token>`.
+
+Each administrator has one token, and you can see it at any time. **Regenerate** replaces it with a new one and the old one stops working at once, so update any client that uses it. **Delete** leaves you with no token.
+
+A token has your permissions. You manage only the platforms granted to you, and so does the token. A root token can change balances on every platform, so keep it like a password. Root can see every administrator's token on the **Admins** page, while an administrator sees only their own. When a token is lost, leaked or no longer needed, regenerate or delete it; any client that uses the old one loses access at once. Changing your password also revokes it. A token cannot generate or delete tokens, nor add, change or delete administrator accounts. Do those on the web page after you log in.
+
+When an AI client calls `adjust_quota`, it really changes balances, and a retried "add" or "subtract" applies again. Try it on a test platform before you let an AI client change balances. As on the web page, a successful write (refresh, balance change, creating, changing or deleting a job) is written to the audit log under the token's owner. Reads are not recorded, and neither is a request that is refused or fails validation. The tools are listed in the [reference](reference.en.md#mcp-endpoint).
+
 ## View the audit log
 
 The **Audit log** page lists actions, newest first, 200 at a time. Click **Load older entries** to go further back. Root sees the actions of every administrator; other administrators see only their own. Each entry has the time, administrator, platform, action and details.
 
-Recorded actions: signing in, refreshing stats, adjusting balances, adding, changing or deleting a job, adding, changing or deleting a platform, and adding, changing or deleting an administrator. The details say what changed. They never contain a token or a password. Failed logins are not recorded.
+Recorded actions: signing in, refreshing stats, adjusting balances, adding, changing or deleting a job, adding, changing or deleting a platform, adding, changing or deleting an administrator, and generating or deleting an API token. The details say what changed. They never contain a token or a password. Failed logins are not recorded.
 
 Runs fired by a scheduled job are not here; see the **Runs** page, where the source is `cron`. The person who created or changed the job appears here.
 

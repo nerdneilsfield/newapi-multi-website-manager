@@ -80,8 +80,8 @@ The web page works through these endpoints. They carry no version guarantee and 
 ### General rules
 
 - Request and response bodies are JSON. A request body must not exceed 1 MiB.
-- Every endpoint except `POST /api/login` requires a logged-in session. The session cookie is named `napm_session`, lasts 7 days, and has the attributes `HttpOnly` and `SameSite=Strict`. napm adds `Secure` only when the request reaches napm over TLS.
-- A state-changing request (any method except `GET`) requires `Content-Type: application/json`. If the request carries an `Origin` header, its host must equal `Host`. Otherwise napm returns `415` or `403`.
+- Every endpoint except `POST /api/login` requires a logged-in session or an API token. The session cookie is named `napm_session`, lasts 7 days, and has the attributes `HttpOnly` and `SameSite=Strict`. napm adds `Secure` only when the request reaches napm over TLS. An API token goes in the header `Authorization: Bearer <token>`; see [API tokens](#api-tokens). When a request carries an `Authorization` header, only the token counts: an invalid token returns `401` and napm does not fall back to the cookie.
+- A state-changing request that uses a session (any method except `GET`) requires `Content-Type: application/json`. The request must also not be cross-origin. Otherwise napm returns `415` or `403`. Go's standard `http.CrossOriginProtection` decides: it checks `Sec-Fetch-Site` first and, when the browser sends none, requires the host in `Origin` to equal `Host`. A request that uses a token skips both checks, because a browser never attaches a token on its own.
 - On failure, napm returns the matching HTTP status code and `{"error": "<reason>"}`.
 - A platform endpoint with `{id}` requires the current administrator to be granted that platform; otherwise napm returns `403`.
 
@@ -183,8 +183,25 @@ Each entry has `id`, `at` (Unix seconds), `admin_id`, `admin`, `platform_id`, `p
 | `platform.delete` | A platform is deleted | `name` |
 | `admin.create`, `admin.update` | An administrator is added or changed | `username`, `root`, `platform_ids`, and `password_changed` on update. The password is never stored. |
 | `admin.delete` | An administrator is deleted | `username` |
+| `token.create`, `token.delete` | An API token is created or deleted | `name` |
 
 Only actions that a person takes through the web page or the API are recorded. Runs fired by a scheduled job are not in the audit log; they are in the run records with the source `cron`.
+
+### API tokens
+
+A token lets an MCP client or a script call the HTTP API as one administrator. It has exactly that administrator's permissions: which platforms it reaches and whether it is root depend on the administrator's current settings, and a change applies at once.
+
+Each administrator has at most one token. An administrator can generate it for themself, and root can generate it for any administrator. Root can read anyone's token, while an administrator can read only their own. Generating a new one replaces the old one, which stops working at once. A token starts with `napm_` followed by 64 hexadecimal characters and never expires. napm stores it in plaintext, protected like the platforms' access tokens by the `0600` mode of the database file. Deleting an administrator, or changing the administrator's password, deletes the token with it.
+
+The three token endpoints below, and `POST /api/admins`, `PUT /api/admins/{id}` and `DELETE /api/admins/{id}` that add, change and delete administrators, accept a session only. A call with a token returns `403`. Otherwise a leaked root token could create a root administrator with a password of its own choosing, or swap itself for a new token, and deleting the original token would not stop it. `GET /api/admins` can still be read with a token; it returns `has_token` but never the token itself.
+
+| Method and path | Description |
+| --- | --- |
+| `GET /api/admins/{id}/token` | Returns `{"token"}`, an empty string when there is none. Your own, or anyone's for root. Another administrator's returns `403`, and an unknown administrator returns `404`. |
+| `POST /api/admins/{id}/token` | Generates a new token and returns `{"token"}`; the existing one is revoked. Same permissions as above. |
+| `DELETE /api/admins/{id}/token` | Deletes the token, which stops working at once. Same permissions as above. |
+
+Generating and deleting a token is written to the audit log as `token.create` and `token.delete`; the details hold only the administrator's user name. The actor is the person who did it, so when root generates a token for someone else, the entry names root.
 
 ### Administrators
 
@@ -192,10 +209,57 @@ All of these endpoints require root.
 
 | Method and path | Description |
 | --- | --- |
-| `GET /api/admins` | Lists administrators, each with `id`, `username`, `root` and `platform_ids`. |
+| `GET /api/admins` | Lists administrators, each with `id`, `username`, `root`, `platform_ids` and `has_token`. |
 | `POST /api/admins` | Adds one. Request `{"username", "password", "root", "platform_ids"}`. A password shorter than 8 characters returns `400`. |
 | `PUT /api/admins/{id}` | Edits one. An empty `password` keeps the password. Changing the password or permissions ends that administrator's sessions. |
 | `DELETE /api/admins/{id}` | Deletes one. You cannot delete yourself. |
+
+## MCP endpoint
+
+napm serves an [MCP](https://modelcontextprotocol.io) server at `POST /mcp`, so an AI client can manage platforms with tools.
+
+### How to connect
+
+- URL: `http(s)://<napm address>/mcp`.
+- Authentication: the header `Authorization: Bearer <API token>`. Only a token works, never the session cookie, so a page open in the browser cannot drive it. A missing or invalid token returns `401`.
+- Implementation: napm uses the Streamable HTTP handler of the official Go SDK, [`modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk). The SDK handles protocol versions, header checks and error codes.
+- Transport: stateless mode. Each `POST` is an independent request and napm answers with one JSON body; it does not use `Mcp-Session-Id`. The request needs `Content-Type: application/json` and an `Accept` that contains both `application/json` and `text/event-stream`, as the SDK requires. In stateless mode `GET /mcp` and `DELETE /mcp` return `405`, and napm pushes no server messages.
+- Capabilities: tools only, no resources or prompts.
+
+### Tools
+
+Each tool calls the HTTP endpoint in the table below inside the process, with the caller's own token. Authorization, validation and the audit log therefore behave as they do on the web page: a successful write is recorded; reads and failed requests are not. The argument names match the endpoint's JSON fields; `platform_id` is the platform `{id}` in the path and `job_id` is the job ID.
+
+| Tool | What it does | HTTP endpoint |
+| --- | --- | --- |
+| `list_platforms` | Lists the platforms you may manage. | `GET /api/platforms` |
+| `get_stats` | Reads the statistics from the last refresh and the last run. | `GET /api/platforms/{id}/stats` |
+| `refresh_stats` | Starts a refresh and returns a `run_id` at once. | `POST /api/platforms/{id}/refresh` |
+| `list_users` | Lists the platform's users page by page; filter by `group` or `keyword`. | `GET /api/platforms/{id}/users` |
+| `adjust_quota` | Changes the balance of some users or of a whole group and returns a `run_id` at once. | `POST /api/platforms/{id}/quota` |
+| `list_runs` | Lists the last 50 runs. | `GET /api/platforms/{id}/runs` |
+| `list_jobs`, `create_job`, `update_job`, `delete_job` | Manage scheduled jobs. | `/api/platforms/{id}/jobs` |
+| `list_audit` | Reads the audit log; page back with `before`. | `GET /api/audit` |
+
+When a tool fails, napm still returns a normal JSON-RPC result with `isError` set to `true`, and the text is the endpoint's `{"error": "..."}`, so the client and the model can correct the arguments. The messages are in Chinese.
+
+`adjust_quota` really changes balances on the target site. `add` and `subtract` are not idempotent, so a client retry applies them again; use `override` when you need idempotence.
+
+### Example client configuration
+
+Create a token on the **Tokens** page; the page shows the configuration too. For a client that supports HTTP transport and custom headers, it looks like this:
+
+```json
+{
+  "mcpServers": {
+    "napm": {
+      "type": "http",
+      "url": "https://napm.example.com/mcp",
+      "headers": { "Authorization": "Bearer napm_<token>" }
+    }
+  }
+}
+```
 
 ## Limits
 
@@ -216,7 +280,7 @@ The SQLite database contains these tables:
 
 | Table | Content |
 | --- | --- |
-| `admins` | Administrators. Passwords are stored as bcrypt hashes. |
+| `admins` | Administrators. Passwords are stored as bcrypt hashes and API tokens in plaintext. |
 | `platforms` | Platforms. Tokens are stored in plaintext. |
 | `admin_platforms` | Which administrator may manage which platform. |
 | `snapshots` | The latest statistics snapshot of each platform. |
@@ -224,4 +288,4 @@ The SQLite database contains these tables:
 | `runs` | Run records. |
 | `audit` | Audit log. It is not deleted with a platform or an administrator, and it is never pruned automatically. |
 
-Deleting a platform or an administrator also deletes the related grants, snapshots, jobs and run records. The audit log is kept.
+Deleting a platform or an administrator also deletes the related grants, snapshots, jobs and run records. The audit log is kept. Deleting an administrator also deletes that administrator's API token.

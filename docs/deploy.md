@@ -13,14 +13,15 @@
 - 访问令牌拥有 `user:write` 权限。持有者可以修改目标站点上任何用户的余额。
 - 会话保存在内存中，napm 按单实例设计。不要同时运行多个共用同一份数据库的 napm 进程。
 - napm 不限制可添加的平台地址，包括内网地址，因为自建的 new-api 通常就在内网。只有 root 管理员能添加平台，请只把 root 交给你信任的人。
-- napm 没有审计日志。执行记录只保存时间、来源、状态和错误，不保存每位用户的调整前后余额。
+- 操作记录会记下谁在什么时候做了什么，但不保存每位用户调整前后的余额。执行记录只保存时间、来源、状态和错误。
+- API 令牌（用于 MCP）与它所属的管理员权限相同，root 的令牌能调整所有平台的余额。napm 以明文保存令牌，靠数据库文件的 `0600` 权限保护，root 能在网页里看到所有管理员的令牌。令牌没有过期时间，泄露后要在网页里重新生成或删除。令牌通过 `Authorization` 头明文传输，所以 `/mcp` 同样要放在 TLS 之后。
 
 napm 已有的防护：
 
 | 威胁 | 做法 |
 | --- | --- |
 | 猜测密码 | 同一客户端 IP 或同一用户名连续失败 5 次，各锁定 1 分钟。 |
-| 跨站请求 | 状态变更请求必须是 JSON，并校验 `Origin`；会话 Cookie 带 `SameSite=Strict`。 |
+| 跨站请求 | 状态变更请求必须是 JSON，并通过 Go 标准库 `http.CrossOriginProtection` 的检查（`Sec-Fetch-Site`，或 `Origin` 与 `Host` 比较）；会话 Cookie 带 `SameSite=Strict`。 |
 | 令牌泄露给其他主机 | napm 不跟随目标站点的重定向。 |
 | 越权 | 普通管理员访问未授权的平台时返回 `403`。 |
 | 点击劫持与内容嗅探 | 响应带 `X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff` 和 `Referrer-Policy: no-referrer`。 |
@@ -88,7 +89,7 @@ napm.example.com {
 }
 ```
 
-反向代理需要保留 `Host` 头，并把浏览器的 `Origin` 头原样转发。napm 比较 `Origin` 的主机和 `Host`，两者不一致时拒绝状态变更请求。
+反向代理需要保留 `Host` 头，并把浏览器的 `Origin` 头原样转发。浏览器不带 `Sec-Fetch-Site` 时，napm 比较 `Origin` 的主机和 `Host`，两者不一致就拒绝状态变更请求。
 
 ## 用 Docker 运行
 
@@ -139,4 +140,4 @@ docker run -d --name napm \
 2. 备份数据库。
 3. 替换二进制或镜像，再启动。
 
-napm 启动时自动创建缺少的表，但没有数据库迁移机制，不会修改已有表的结构。升级前查看新版本的 GitHub Release 说明，确认没有表结构变化。
+napm 启动时用 [goose](https://github.com/pressly/goose) 把数据库升到当前版本，已有数据保留。版本记录在表 `goose_db_version` 中。迁移不能回退，所以升级前的备份是回退的唯一办法。
