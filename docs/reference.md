@@ -11,7 +11,7 @@
 启动网页和定时任务调度器。收到 `SIGINT` 或 `SIGTERM` 后，napm 停止接受新请求，并在 5 秒内关闭 HTTP 服务。
 
 ```text
-napm serve [--addr <地址>] [--db <路径>] [--interval <时长>] [-v]
+napm serve [--addr <地址>] [--db <路径>] [--interval <时长>] [--usage-months <月数>] [-v]
 ```
 
 | 参数 | 类型 | 默认值 | 说明 |
@@ -19,6 +19,7 @@ napm serve [--addr <地址>] [--db <路径>] [--interval <时长>] [-v]
 | `--addr` | 字符串 | `127.0.0.1:8080` | HTTP 监听地址，格式为 `<主机>:<端口>`。 |
 | `--db` | 路径 | `napm.db` | SQLite 数据库文件。文件不存在时创建。每次启动都把文件权限设为 `0600`。 |
 | `--interval` | 时长 | `600ms` | 对同一个平台发出两次请求之间的最小间隔。例如 `1s`。 |
+| `--usage-months` | 整数 | `12` | 保留多少个月的用量。第一次采集回填这么久，之后每次采集删除更早的行。 |
 | `-v`, `--verbose` | 布尔 | 关闭 | 输出调试日志。适用于全部命令。 |
 
 日志写入 stderr。
@@ -144,6 +145,25 @@ napm 接受 `robfig/cron` 的标准写法，表达式不含秒字段：
 {"mode": "add", "amount": 1, "unit": "usd", "group": "vip"}
 ```
 
+### 用量
+
+| 方法与路径 | 说明 |
+| --- | --- |
+| `POST /api/platforms/{id}/usage/collect` | 开始采集用量，返回 `{"run_id"}`。需要平台令牌带 `log:read`。该平台已有任务在运行时返回 `409`。 |
+| `GET /api/platforms/{id}/usage` | 返回已采集的用量，不做分析。 |
+
+`GET` 的查询参数：
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `from`、`to` | 30 天前、现在 | Unix 秒，区间为 `[from, to)`。 |
+| `step` | `day` | `day` 把小时行合并成天，`hour` 返回小时行。`hour` 的区间最长 14 天。其他值返回 `400`。 |
+| `tz` | `0` | 东区为正的分钟数，决定「天」从几点开始。例如东八区是 `480`。 |
+
+返回 `{"state", "from", "to", "step", "models", "users"}`。`state` 为 `{"collected_to", "quota_per_unit"}`，从未采集时为 `null`。`models` 每项含 `t`（桶的起点，Unix 秒）、`model`、`count`（请求数）、`quota`（原始额度）、`tokens`；`users` 同理，把 `model` 换成 `username`。`quota` 除以 `quota_per_unit` 得金额。
+
+new-api 在一个小时结束后还会继续累加它的计数，所以每次采集从上次的水位往前多取 2 小时，重复取到的小时覆盖旧值而不是相加。
+
 ### 定时任务与执行记录
 
 | 方法与路径 | 说明 |
@@ -159,10 +179,10 @@ napm 接受 `robfig/cron` 的标准写法，表达式不含秒字段：
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `name` | 字符串 | 是 | 任务名称。 |
-| `kind` | 字符串 | 是 | `refresh` 或 `quota`。 |
+| `kind` | 字符串 | 是 | `refresh`、`usage` 或 `quota`。 |
 | `spec` | 字符串 | 是 | 定时表达式，规则见[定时表达式](#定时表达式)。无效时返回 `400`。 |
 | `enabled` | 布尔 | 否 | 是否启用。 |
-| `plan` | 对象 | `kind` 为 `quota` 时必填 | 调整计划，字段同上。`kind` 为 `refresh` 时忽略。 |
+| `plan` | 对象 | `kind` 为 `quota` 时必填 | 调整计划，字段同上。`kind` 为 `refresh` 或 `usage` 时忽略。 |
 
 ### 操作记录
 
@@ -176,14 +196,15 @@ napm 接受 `robfig/cron` 的标准写法，表达式不含秒字段：
 | --- | --- | --- |
 | `login` | 登录成功 | 空对象。登录失败不记录。 |
 | `refresh` | 手动开始刷新 | `run_id` |
+| `usage.collect` | 手动开始采集用量 | `run_id` |
 | `quota` | 手动开始调额 | `run_id` 和 `plan` |
 | `job.create`、`job.update` | 新增、修改任务，包括启用或停用 | `name`、`kind`、`spec`、`enabled`、`plan` |
 | `job.delete` | 删除任务 | `name` |
 | `platform.create`、`platform.update` | 添加、修改平台 | `name`、`base_url`、`token_changed`。不含令牌本身。 |
 | `platform.delete` | 删除平台 | `name` |
-| `admin.create`、`admin.update` | 新增、修改管理员 | `username`、`root`、`platform_ids`，修改时另有 `password_changed`。不含密码。 |
+| `admin.create`、`admin.update` | 新增、修改管理员 | `username`、`root`、`read_only`、`platform_ids`，修改时另有 `password_changed`。不含密码。 |
 | `admin.delete` | 删除管理员 | `username` |
-| `token.create`、`token.delete` | 创建、删除 API 令牌 | `name` |
+| `token.create`、`token.delete` | 生成、删除 API 令牌 | `username`，即令牌所属的管理员 |
 
 只有人通过网页或接口做的操作会记录。定时任务自己触发的执行不进操作记录，它们在执行记录里，来源为 `cron`。
 
@@ -209,8 +230,8 @@ napm 接受 `robfig/cron` 的标准写法，表达式不含秒字段：
 
 | 方法与路径 | 说明 |
 | --- | --- |
-| `GET /api/admins` | 列出管理员，每项含 `id`、`username`、`root`、`platform_ids`、`has_token`。 |
-| `POST /api/admins` | 新增。请求 `{"username", "password", "root", "platform_ids"}`。密码少于 8 个字符返回 `400`。 |
+| `GET /api/admins` | 列出管理员，每项含 `id`、`username`、`root`、`read_only`、`platform_ids`、`has_token`。 |
+| `POST /api/admins` | 新增。请求 `{"username", "password", "root", "read_only", "platform_ids"}`。密码少于 8 个字符返回 `400`，`root` 与 `read_only` 同时为真也返回 `400`。 |
 | `PUT /api/admins/{id}` | 修改。`password` 为空表示不改密码。修改密码或权限会使该管理员的会话失效。 |
 | `DELETE /api/admins/{id}` | 删除。不能删除自己。 |
 
@@ -237,6 +258,8 @@ napm 在 `POST /mcp` 提供一个 [MCP](https://modelcontextprotocol.io) 服务�
 | `refresh_stats` | 开始刷新统计，立即返回 `run_id`。 | `POST /api/platforms/{id}/refresh` |
 | `list_users` | 分页列出平台用户，可按 `group`、`keyword` 过滤。 | `GET /api/platforms/{id}/users` |
 | `adjust_quota` | 修改某些用户或整个分组的余额，立即返回 `run_id`。 | `POST /api/platforms/{id}/quota` |
+| `get_usage` | 读取已采集的用量行（按模型、按用户，按天或按小时）。趋势、排行、异常等分析由调用方自己基于这些行计算。 | `GET /api/platforms/{id}/usage` |
+| `collect_usage` | 开始采集平台用量，立即返回 `run_id`。 | `POST /api/platforms/{id}/usage/collect` |
 | `list_runs` | 列出最近 50 次执行。 | `GET /api/platforms/{id}/runs` |
 | `list_jobs`、`create_job`、`update_job`、`delete_job` | 管理定时任务。 | `/api/platforms/{id}/jobs` |
 | `list_audit` | 读取操作记录，可用 `before` 翻页。 | `GET /api/audit` |
@@ -284,6 +307,8 @@ SQLite 数据库包含下列表：
 | `platforms` | 平台，令牌以明文保存。 |
 | `admin_platforms` | 管理员与平台的授权关系。 |
 | `snapshots` | 每个平台最近一次统计快照。 |
+| `usage_model`、`usage_user` | 采集到的小时级用量，按平台、小时和模型或用户各一行。 |
+| `usage_state` | 每个平台用量采集到哪个时间，以及当时的 `quota_per_unit`。 |
 | `jobs` | 定时任务。 |
 | `runs` | 执行记录。 |
 | `audit` | 操作记录。不随平台或管理员的删除而删除，也不会自动清理。 |

@@ -7,9 +7,9 @@ napm manages several [new-api](https://github.com/QuantumNous/new-api) sites fro
 ## Features
 
 - One Go binary with the web page embedded. Data lives in a single SQLite file, with no CGO and no external database.
-- Each administrator sees and operates only the platforms granted to them.
+- Each administrator sees and operates only the platforms granted to them. A read-only account can look but not change.
 - A balance can be added to, subtracted from, or set to a fixed value, and the amount can be entered in USD or raw quota.
-- Scheduled jobs refresh statistics or change balances, using a cron expression or an `@every` interval.
+- Scheduled jobs refresh statistics, collect usage or change balances, using a cron expression or an `@every` interval.
 - An MCP endpoint lets an AI client manage platforms with an administrator's API token (`Authorization: Bearer`). The token has that administrator's permissions, and a successful write is written to the audit log.
 - napm runs one job at a time per platform and spaces its requests, so it stays under new-api's rate limit.
 

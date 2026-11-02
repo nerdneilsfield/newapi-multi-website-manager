@@ -18,7 +18,7 @@ Prerequisites:
 Steps:
 
 1. Log in to the target site and open the security settings ("安全设置").
-2. Create an access token with the three permissions `user:read`, `user:write` and `group:read`. The token starts with `nap_`.
+2. Create an access token with the three permissions `user:read`, `user:write` and `group:read`. To collect usage (see [View usage](#view-usage)), add `log:read`. The token starts with `nap_`.
 3. Copy the token. The target site shows it only when you create it.
 
 You can create an access token only by hand on the target site, not with another access token. The account that owns the token must be an administrator of the target site.
@@ -41,6 +41,7 @@ Only root administrators can manage administrator accounts.
 2. In the last row, enter a user name and a password (at least 8 characters), tick the platforms the administrator may manage, and click **Add**.
 3. A non-root administrator sees only the ticked platforms after logging in.
 4. Ticking "root" makes the account a root administrator, who can manage all platforms and all administrators.
+5. Ticking "Read-only" makes the account look but not touch. It can see the granted platforms' statistics, users, usage, jobs and run records, but cannot refresh, collect, adjust balances, change jobs, or add or delete platforms and administrators. Its API token is read-only too, and it can still manage its own token. Root cannot also be read-only.
 
 After you change an administrator's password or permissions, that administrator's logged-in sessions end at once and the administrator must log in again. A root administrator cannot remove their own root permission or delete their own account.
 
@@ -51,6 +52,25 @@ The **Stats** page shows the result of the latest refresh: the number of users, 
 Clicking **Refresh stats** reads all users on the target site and totals them again. A refresh takes a while when there are many users, because napm waits at least 600 ms between requests to one platform and reads 100 users per page. While the refresh runs, the button reads **Refreshing…**, and the page updates when it finishes.
 
 The **Users** page lists the target site's users page by page. You can filter by keyword (user name, email or ID) and by group. This page shows balances as raw quota.
+
+## View usage
+
+The **Usage** page answers where the money goes, when, and who is using it. Its data comes from the target site's data dashboard (`/api/data/`), so the platform token needs `log:read` and the site must have the dashboard on.
+
+1. Open **Usage** and click **Collect usage**. The first run backfills the last 12 months; later runs fetch only what is new. A long backfill goes in pieces, and if it fails halfway, click again to resume from where it stopped.
+2. Under **Schedules**, add a job of type "Collect usage", for example `0 * * * *`, to keep the data fresh.
+3. Pick the last 7, 14 or 30 days at the top.
+
+The page shows four figures (spend, requests, tokens and active users, each compared with the period of the same length before), a set of "What stands out" lines, a bar chart of daily spend, the spread of requests across the day, and rankings by model and by user.
+
+Every line under "What stands out" is computed from your data, and a line without support does not appear:
+
+- The change against the previous period, and a month's spend extrapolated from the daily average of the last 7 days.
+- An unusual day: spend more than three spreads above the usual (the median) and at least 75% higher. The bar chart outlines it.
+- One user or model with a very large share; the biggest rise and drop among users; how many users are new and how many did not appear again.
+- The quietest four hours in a row each day, a good window for maintenance or bulk adjustments, and the busiest hour; weekends clearly lower or higher than weekdays.
+
+The analysis runs in your browser. The server stores only the hourly rows. A "day" follows your computer's local time zone, and today is not counted because it is not over. Usage is kept for 12 months by default, set with `--usage-months`; rows beyond that are deleted after each collection.
 
 ## Change balances
 
@@ -78,7 +98,7 @@ napm never retries a failed change automatically.
 ## Schedule jobs
 
 1. Open **Schedules**.
-2. Enter a job name and choose the type: **Refresh stats** or **Adjust balance**.
+2. Enter a job name and choose the type: **Refresh stats**, **Collect usage** or **Adjust balance**.
 3. Enter the schedule. Two forms are accepted:
    - A 5-field cron expression in the order minute, hour, day of month, month, day of week. For example, `0 3 * * *` runs every day at 03:00.
    - A predefined form such as `@every <interval>` or `@daily`. For example, `@every 6h` runs every 6 hours.

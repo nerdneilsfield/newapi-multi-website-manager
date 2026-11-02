@@ -11,7 +11,7 @@ This page lists napm's command-line flags, environment variables, HTTP API, stat
 Starts the web page and the job scheduler. After `SIGINT` or `SIGTERM`, napm stops accepting new requests and shuts the HTTP server down within 5 seconds.
 
 ```text
-napm serve [--addr <address>] [--db <path>] [--interval <duration>] [-v]
+napm serve [--addr <address>] [--db <path>] [--interval <duration>] [--usage-months <months>] [-v]
 ```
 
 | Flag | Type | Default | Description |
@@ -19,6 +19,7 @@ napm serve [--addr <address>] [--db <path>] [--interval <duration>] [-v]
 | `--addr` | string | `127.0.0.1:8080` | HTTP listen address, in the form `<host>:<port>`. |
 | `--db` | path | `napm.db` | SQLite database file. napm creates it if it does not exist and sets its file mode to `0600` on every start. |
 | `--interval` | duration | `600ms` | Minimum gap between two requests to one platform. For example, `1s`. |
+| `--usage-months` | integer | `12` | How many months of usage to keep. The first collection backfills that far, and each later one deletes older rows. |
 | `-v`, `--verbose` | boolean | off | Print debug logs. Applies to all commands. |
 
 Logs go to stderr.
@@ -122,6 +123,25 @@ Fields of `stats`:
 | `requests` | integer | Total number of requests. |
 | `groups` | array | Sorted by group name in ascending order. Each item has `name`, `users`, `quota`, `used` and `requests`. |
 
+### Usage
+
+| Method and path | Description |
+| --- | --- |
+| `POST /api/platforms/{id}/usage/collect` | Starts collecting usage and returns `{"run_id"}`. The platform token needs `log:read`. Returns `409` when a run is already in progress on the platform. |
+| `GET /api/platforms/{id}/usage` | Returns the collected usage, without any analysis. |
+
+Query parameters of the `GET`:
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `from`, `to` | 30 days ago, now | Unix seconds, the range is `[from, to)`. |
+| `step` | `day` | `day` sums the hourly rows into days, `hour` returns the hourly rows. An `hour` range is at most 14 days. Any other value returns `400`. |
+| `tz` | `0` | Minutes east of UTC, which sets where a day starts. UTC+8 is `480`. |
+
+It returns `{"state", "from", "to", "step", "models", "users"}`. `state` is `{"collected_to", "quota_per_unit"}`, or `null` when nothing was collected. Each item of `models` has `t` (the start of the bucket, Unix seconds), `model`, `count` (requests), `quota` (raw quota) and `tokens`; `users` is the same with `username` in place of `model`. Divide `quota` by `quota_per_unit` for money.
+
+new-api keeps adding to an hour's counters after the hour ends, so each collection starts 2 hours before the last watermark, and an hour fetched again replaces its old value instead of adding to it.
+
 ### Change balances
 
 `POST /api/platforms/{id}/quota`
@@ -159,10 +179,10 @@ Fields of a job:
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `name` | string | yes | Job name. |
-| `kind` | string | yes | `refresh` or `quota`. |
+| `kind` | string | yes | `refresh`, `usage` or `quota`. |
 | `spec` | string | yes | Schedule expression. See [Schedule expressions](#schedule-expressions). An invalid one returns `400`. |
 | `enabled` | boolean | no | Whether the job is enabled. |
-| `plan` | object | required when `kind` is `quota` | Adjustment plan, with the fields above. Ignored when `kind` is `refresh`. |
+| `plan` | object | required when `kind` is `quota` | Adjustment plan, with the fields above. Ignored when `kind` is `refresh` or `usage`. |
 
 ### Audit log
 
@@ -176,14 +196,15 @@ Each entry has `id`, `at` (Unix seconds), `admin_id`, `admin`, `platform_id`, `p
 | --- | --- | --- |
 | `login` | A successful login | Empty object. Failed logins are not recorded. |
 | `refresh` | A manual refresh starts | `run_id` |
+| `usage.collect` | A usage collection is started by hand | `run_id` |
 | `quota` | A manual balance change starts | `run_id` and `plan` |
 | `job.create`, `job.update` | A job is added or changed, including enabling or disabling it | `name`, `kind`, `spec`, `enabled`, `plan` |
 | `job.delete` | A job is deleted | `name` |
 | `platform.create`, `platform.update` | A platform is added or changed | `name`, `base_url`, `token_changed`. The token itself is never stored. |
 | `platform.delete` | A platform is deleted | `name` |
-| `admin.create`, `admin.update` | An administrator is added or changed | `username`, `root`, `platform_ids`, and `password_changed` on update. The password is never stored. |
+| `admin.create`, `admin.update` | An administrator is added or changed | `username`, `root`, `read_only`, `platform_ids`, and `password_changed` on update. The password is never stored. |
 | `admin.delete` | An administrator is deleted | `username` |
-| `token.create`, `token.delete` | An API token is created or deleted | `name` |
+| `token.create`, `token.delete` | An API token is generated or deleted | `username`, the administrator the token belongs to |
 
 Only actions that a person takes through the web page or the API are recorded. Runs fired by a scheduled job are not in the audit log; they are in the run records with the source `cron`.
 
@@ -209,8 +230,8 @@ All of these endpoints require root.
 
 | Method and path | Description |
 | --- | --- |
-| `GET /api/admins` | Lists administrators, each with `id`, `username`, `root`, `platform_ids` and `has_token`. |
-| `POST /api/admins` | Adds one. Request `{"username", "password", "root", "platform_ids"}`. A password shorter than 8 characters returns `400`. |
+| `GET /api/admins` | Lists administrators, each with `id`, `username`, `root`, `read_only`, `platform_ids` and `has_token`. |
+| `POST /api/admins` | Adds one. Request `{"username", "password", "root", "read_only", "platform_ids"}`. A password shorter than 8 characters returns `400`, and so do `root` and `read_only` both true. |
 | `PUT /api/admins/{id}` | Edits one. An empty `password` keeps the password. Changing the password or permissions ends that administrator's sessions. |
 | `DELETE /api/admins/{id}` | Deletes one. You cannot delete yourself. |
 
@@ -237,6 +258,8 @@ Each tool calls the HTTP endpoint in the table below inside the process, with th
 | `refresh_stats` | Starts a refresh and returns a `run_id` at once. | `POST /api/platforms/{id}/refresh` |
 | `list_users` | Lists the platform's users page by page; filter by `group` or `keyword`. | `GET /api/platforms/{id}/users` |
 | `adjust_quota` | Changes the balance of some users or of a whole group and returns a `run_id` at once. | `POST /api/platforms/{id}/quota` |
+| `get_usage` | Reads the collected usage rows (per model and per user, by day or by hour). Trends, rankings and anomalies are for the caller to compute from these rows. | `GET /api/platforms/{id}/usage` |
+| `collect_usage` | Starts collecting the platform's usage and returns a `run_id` at once. | `POST /api/platforms/{id}/usage/collect` |
 | `list_runs` | Lists the last 50 runs. | `GET /api/platforms/{id}/runs` |
 | `list_jobs`, `create_job`, `update_job`, `delete_job` | Manage scheduled jobs. | `/api/platforms/{id}/jobs` |
 | `list_audit` | Reads the audit log; page back with `before`. | `GET /api/audit` |
@@ -284,6 +307,8 @@ The SQLite database contains these tables:
 | `platforms` | Platforms. Tokens are stored in plaintext. |
 | `admin_platforms` | Which administrator may manage which platform. |
 | `snapshots` | The latest statistics snapshot of each platform. |
+| `usage_model`, `usage_user` | Collected hourly usage, one row per platform, hour and model or user. |
+| `usage_state` | How far each platform's usage has been collected, and its `quota_per_unit` at the time. |
 | `jobs` | Scheduled jobs. |
 | `runs` | Run records. |
 | `audit` | Audit log. It is not deleted with a platform or an administrator, and it is never pruned automatically. |
