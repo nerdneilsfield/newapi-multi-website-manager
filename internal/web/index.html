@@ -288,7 +288,8 @@ const failBox=(e,retry)=>$('div',{className:'fail',role:'alert'},e.message,retry
 // Everything on the usage page is computed here, in the browser, from the rows the server stores.
 // day: the /usage answer by day (the n complete days before today and the n before those, plus today);
 // hours: its answer by hour. today is the local midnight of today and off the zone's seconds east of UTC.
-// hours is only as long as the server allows (14 days), so for 30 days the hour-of-day view covers the last 14.
+// hours holds whole local days only and is capped by the server at 14 days, so it reaches back at most 13 days from
+// today's midnight: for a 30-day range the hour-of-day view covers the last 13 complete days.
 // shortcut: one fixed UTC offset for the whole range, so across a DST change a day can start an hour off.
 const median=a=>{if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2};
 function analyze(day,hours,n,today,off){
@@ -307,7 +308,7 @@ function analyze(day,hours,n,today,off){
   const rank=(m,p)=>[...m].map(([name,x])=>({name,...x,prev:p.get(name)?.quota||0})).sort((a,b)=>b.quota-a.quota);
   const models=rank(sum(day.models,lo,today,'model'),sum(day.models,plo,lo,'model'));
   const users=rank(curU,prevU);
-  const hasPrev=prev.count>0&&prev.quota>0; // a free previous period has nothing to compare against
+  const hasPrev=prev.quota>0; // a free previous period has nothing to compare against
   let movers=null;
   if(hasPrev){
     const names=new Set([...curU.keys(),...prevU.keys()]);
@@ -315,7 +316,7 @@ function analyze(day,hours,n,today,off){
     const up=all.filter(x=>x.d>0).sort((a,b)=>b.d-a.d)[0],down=all.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0];
     movers={up,down,fresh:all.filter(x=>x.cur>0&&x.prev===0).length,gone:all.filter(x=>x.prev>0&&x.cur===0).length};
   }
-  const hod=Array(24).fill(0);for(const r of hours.models)if(r.t>=lo&&r.t<today)hod[Math.floor((((r.t+off)%D+D)%D)/3600)]+=r.count;
+  const hod=Array(24).fill(0);for(const r of hours.models)if(r.t>=Math.max(lo,today-13*D)&&r.t<today)hod[Math.floor((((r.t+off)%D+D)%D)/3600)]+=r.count;
   let quiet=null,peak=null;
   if(hod.filter(x=>x>0).length>=12){
     let best=0,bs=Infinity;for(let st=0;st<24;st++){let x=0;for(let i=0;i<4;i++)x+=hod[(st+i)%24];if(x<bs){bs=x;best=st}}
@@ -444,7 +445,7 @@ async usage(el){
   const off=-d0.getTimezoneOffset()*60,tz=off/60,today=Math.floor(d0.getTime()/1000);
   const D=86400,from=today-2*n*D,to=Math.floor(Date.now()/1000)+1;
   const q=`from=${from}&to=${to}&tz=${tz}`;
-  const [day,hr,runs]=await Promise.all([api('GET',`${P()}/usage?${q}&step=day`),api('GET',`${P()}/usage?from=${Math.max(from,to-14*D)}&to=${to}&tz=${tz}&step=hour`),api('GET',P()+'/runs')]);
+  const [day,hr,runs]=await Promise.all([api('GET',`${P()}/usage?${q}&step=day`),api('GET',`${P()}/usage?from=${Math.max(from,today-Math.min(n,13)*D)}&to=${to}&tz=${tz}&step=hour`),api('GET',P()+'/runs')]);
   const run=runs.find(r=>r.kind==='usage');const busy=run&&run.status==='running';
   const msg=$('span',{className:'msg',role:'status'});
   const sel=$('select',{'aria-label':t('range'),on:{change:e=>{S.usageDays=+e.target.value;render()}}},[7,14,30].map(k=>$('option',{value:k,selected:k===n},t('lastDays',{n:k}))));

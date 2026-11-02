@@ -134,7 +134,7 @@ Query parameters of the `GET`:
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `from`, `to` | 30 days ago, now | Unix seconds, the range is `[from, to)`. |
+| `from`, `to` | 30 days ago, now | Unix seconds, the range is `[from, to)`. With `step=hour`, `from` defaults to 14 days ago. |
 | `step` | `day` | `day` sums the hourly rows into days, `hour` returns the hourly rows. An `hour` range is at most 14 days. Any other value returns `400`. |
 | `tz` | `0` | Minutes east of UTC, which sets where a day starts. UTC+8 is `480`. |
 

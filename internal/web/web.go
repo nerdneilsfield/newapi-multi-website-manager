@@ -437,7 +437,11 @@ func (s *Server) usage(w http.ResponseWriter, r *http.Request, _ store.Admin) {
 	}
 	now := time.Now().Unix()
 	to := num("to", now+1)
-	from := num("from", to-30*24*3600)
+	span := int64(30 * 24 * 3600)
+	if q.Get("step") == "hour" {
+		span = maxHourlySpan
+	}
+	from := num("from", to-span)
 	tz := int(num("tz", 0))
 	day := q.Get("step") != "hour"
 	if q.Get("step") != "" && q.Get("step") != "hour" && q.Get("step") != "day" {

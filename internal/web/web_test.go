@@ -726,6 +726,9 @@ func TestUsageEndpointFollowsGrantsAndReadOnly(t *testing.T) {
 	if c, _ = get(rootC, "/api/platforms/1/usage?step=week"); c != 400 {
 		t.Errorf("bad step: %d", c)
 	}
+	if c, _ = get(rootC, "/api/platforms/1/usage?step=hour"); c != 200 {
+		t.Errorf("hourly default range: %d", c)
+	}
 	if c, _ = get(rootC, "/api/platforms/1/usage?step=hour&from=0&to=99999999"); c != 400 {
 		t.Errorf("hourly span: %d", c)
 	}
