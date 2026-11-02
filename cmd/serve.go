@@ -22,10 +22,14 @@ import (
 func newServeCmd() *cobra.Command {
 	var addr, dbPath string
 	var interval time.Duration
+	var usageMonths int
 	c := &cobra.Command{
 		Use:   "serve",
 		Short: "Run the multi-platform manager web UI and scheduler.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if usageMonths < 1 {
+				return fmt.Errorf("--usage-months must be at least 1, got %d", usageMonths)
+			}
 			log := loggerFrom(cmd)
 			st, err := store.Open(dbPath)
 			if err != nil {
@@ -40,6 +44,7 @@ func newServeCmd() *cobra.Command {
 			}
 
 			mgr := manager.New(cmd.Context(), st, log, interval)
+			mgr.UsageMonths = usageMonths
 			if err = mgr.Reload(); err != nil {
 				return err
 			}
@@ -65,6 +70,7 @@ func newServeCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&addr, "addr", "127.0.0.1:8080", "listen address")
 	c.Flags().StringVar(&dbPath, "db", "napm.db", "SQLite database path")
+	c.Flags().IntVar(&usageMonths, "usage-months", 12, "months of collected usage to keep")
 	c.Flags().DurationVar(&interval, "interval", 600*time.Millisecond, "minimum gap between requests to one platform (new-api allows 360 per 3 minutes per IP)")
 	return c
 }
@@ -101,6 +107,6 @@ func bootstrapAdmin(st *store.Store, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	_, err = st.CreateAdmin(user, string(hash), true, nil)
+	_, err = st.CreateAdmin(user, string(hash), true, false, nil)
 	return err
 }

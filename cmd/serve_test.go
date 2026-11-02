@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -28,5 +29,18 @@ func TestBootstrapAdminRejectsShortPassword(t *testing.T) {
 	}
 	if n, _ := st.CountAdmins(); n != 1 {
 		t.Fatalf("admins: %d", n)
+	}
+}
+
+// A retention below one month would make every collection delete what it just saved, or, when negative,
+// everything the platform has, while the run still reports success.
+func TestServeRejectsUsageMonthsBelowOne(t *testing.T) {
+	for _, v := range []string{"0", "-1"} {
+		c := newServeCmd()
+		c.SetArgs([]string{"--db", filepath.Join(t.TempDir(), "t.db"), "--usage-months", v})
+		c.SilenceUsage, c.SilenceErrors = true, true
+		if err := c.Execute(); err == nil || !strings.Contains(err.Error(), "--usage-months") {
+			t.Fatalf("--usage-months %s: %v", v, err)
+		}
 	}
 }

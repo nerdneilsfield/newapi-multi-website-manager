@@ -32,7 +32,7 @@ func (s *Server) sessionAuth(root bool, h handler) http.HandlerFunc {
 			fail(w, http.StatusForbidden, "令牌不能管理令牌和管理员账号，请登录网页后操作")
 			return
 		}
-		s.auth(root, h)(w, r)
+		s.authAny(root, h)(w, r) // a read-only admin may still manage their own token
 	}
 }
 

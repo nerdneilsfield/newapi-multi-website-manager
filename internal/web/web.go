@@ -70,7 +70,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/login", s.login)
 	mux.HandleFunc("POST /api/logout", s.logout)
 	mux.HandleFunc("GET /api/me", s.auth(false, func(w http.ResponseWriter, _ *http.Request, me store.Admin) {
-		writeJSON(w, map[string]any{"id": me.ID, "username": me.Username, "root": me.IsRoot, "has_token": me.APIToken != ""})
+		writeJSON(w, map[string]any{"id": me.ID, "username": me.Username, "root": me.IsRoot, "read_only": me.ReadOnly, "has_token": me.APIToken != ""})
 	}))
 
 	mux.HandleFunc("GET /api/platforms", s.auth(false, s.listPlatforms))
@@ -83,6 +83,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/platforms/{id}/users", s.platform(s.users))
 	mux.HandleFunc("POST /api/platforms/{id}/quota", s.platform(s.quota))
 	mux.HandleFunc("GET /api/platforms/{id}/runs", s.platform(s.runs))
+	mux.HandleFunc("GET /api/platforms/{id}/usage", s.platform(s.usage))
+	mux.HandleFunc("POST /api/platforms/{id}/usage/collect", s.platform(s.collectUsage))
 	mux.HandleFunc("GET /api/platforms/{id}/jobs", s.platform(s.listJobs))
 	mux.HandleFunc("POST /api/platforms/{id}/jobs", s.platform(s.saveJob))
 	mux.HandleFunc("PUT /api/platforms/{id}/jobs/{job}", s.platform(s.saveJob))
@@ -202,8 +204,21 @@ func (s *Server) authenticate(w http.ResponseWriter, r *http.Request) (store.Adm
 	return me, true
 }
 
-// auth requires a valid session or token; root additionally requires a root admin.
+// auth requires a valid session or token; root additionally requires a root admin. A read-only
+// admin gets through only for GET, so no handler has to remember to refuse it.
 func (s *Server) auth(root bool, h handler) http.HandlerFunc {
+	return s.authAny(root, func(w http.ResponseWriter, r *http.Request, me store.Admin) {
+		if me.ReadOnly && r.Method != http.MethodGet {
+			fail(w, http.StatusForbidden, "只读账号不能修改数据")
+			return
+		}
+		h(w, r, me)
+	})
+}
+
+// authAny is auth without the read-only check, for what a read-only admin may still do: manage
+// their own token.
+func (s *Server) authAny(root bool, h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		me, ok := s.authenticate(w, r)
 		if !ok {
@@ -401,6 +416,63 @@ func (s *Server) refresh(w http.ResponseWriter, r *http.Request, me store.Admin)
 	s.started(w, func(runID int64) { s.auditP(me, id, "refresh", map[string]any{"run_id": runID}) })(s.Mgr.Refresh(id, nil, "", me.Username))
 }
 
+func (s *Server) collectUsage(w http.ResponseWriter, r *http.Request, me store.Admin) {
+	id := pathID(r, "id")
+	s.started(w, func(runID int64) { s.auditP(me, id, "usage.collect", map[string]any{"run_id": runID}) })(s.Mgr.CollectUsage(id, nil, "", me.Username))
+}
+
+// maxHourlySpan caps an hourly request: a year of hourly rows per model is too much to send.
+const maxHourlySpan = 14 * 24 * 3600
+
+// usage returns the collected usage between from and to (Unix seconds, to excluded; default the
+// last 30 days) as per-model and per-user rows, by "hour" or by local "day" (tz is minutes east of
+// UTC). Insights are computed from these rows in the browser or by the MCP client.
+func (s *Server) usage(w http.ResponseWriter, r *http.Request, _ store.Admin) {
+	q, id := r.URL.Query(), pathID(r, "id")
+	num := func(k string, def int64) int64 {
+		if v, err := strconv.ParseInt(q.Get(k), 10, 64); err == nil {
+			return v
+		}
+		return def
+	}
+	now := time.Now().Unix()
+	to := num("to", now+1)
+	from := num("from", to-30*24*3600)
+	tz := int(num("tz", 0))
+	day := q.Get("step") != "hour"
+	if q.Get("step") != "" && q.Get("step") != "hour" && q.Get("step") != "day" {
+		fail(w, 400, "step 必须是 hour 或 day")
+		return
+	}
+	if from >= to || tz < -14*60 || tz > 14*60 {
+		fail(w, 400, "时间范围或时区无效")
+		return
+	}
+	if !day && to-from > maxHourlySpan {
+		fail(w, 400, "按小时查询最多 14 天")
+		return
+	}
+	var state *store.UsageState
+	switch st, err := s.Store.UsageState(id); {
+	case err == nil:
+		state = &st
+	case !errors.Is(err, sql.ErrNoRows):
+		fail(w, 500, err.Error())
+		return
+	}
+	models, err := s.Store.UsageModels(id, from, to, day, tz)
+	if err != nil {
+		fail(w, 500, err.Error())
+		return
+	}
+	users, err := s.Store.UsageUsers(id, from, to, day, tz)
+	if err != nil {
+		fail(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, map[string]any{"state": state, "from": from, "to": to, "step": map[bool]string{true: "day", false: "hour"}[day], "models": models, "users": users})
+}
+
 // started answers a run launch and calls onStart once the run exists.
 func (s *Server) started(w http.ResponseWriter, onStart func(runID int64)) func(int64, error) {
 	return func(runID int64, err error) {
@@ -496,6 +568,8 @@ func (s *Server) saveJob(w http.ResponseWriter, r *http.Request, me store.Admin)
 	switch j.Kind {
 	case "refresh":
 		j.Plan = nil
+	case "usage":
+		j.Plan = nil
 	case "quota":
 		if j.Plan == nil {
 			fail(w, 400, "需要 plan")
@@ -506,7 +580,7 @@ func (s *Server) saveJob(w http.ResponseWriter, r *http.Request, me store.Admin)
 			return
 		}
 	default:
-		fail(w, 400, "kind 必须是 refresh 或 quota")
+		fail(w, 400, "kind 必须是 refresh、usage 或 quota")
 		return
 	}
 	action := "job.update"
@@ -555,6 +629,7 @@ type adminView struct {
 	ID          int64   `json:"id"`
 	Username    string  `json:"username"`
 	Root        bool    `json:"root"`
+	ReadOnly    bool    `json:"read_only"`
 	PlatformIDs []int64 `json:"platform_ids"`
 	HasToken    bool    `json:"has_token"`
 }
@@ -570,7 +645,7 @@ func (s *Server) listAdmins(w http.ResponseWriter, _ *http.Request, _ store.Admi
 		if a.PlatformIDs == nil {
 			a.PlatformIDs = []int64{}
 		}
-		out = append(out, adminView{a.ID, a.Username, a.IsRoot, a.PlatformIDs, a.APIToken != ""})
+		out = append(out, adminView{a.ID, a.Username, a.IsRoot, a.ReadOnly, a.PlatformIDs, a.APIToken != ""})
 	}
 	writeJSON(w, out)
 }
@@ -580,9 +655,14 @@ func (s *Server) saveAdmin(w http.ResponseWriter, r *http.Request, me store.Admi
 		Username    string  `json:"username"`
 		Password    string  `json:"password"`
 		Root        bool    `json:"root"`
+		ReadOnly    bool    `json:"read_only"`
 		PlatformIDs []int64 `json:"platform_ids"`
 	}
 	if !readJSON(w, r, &in) {
+		return
+	}
+	if in.Root && in.ReadOnly {
+		fail(w, 400, "root 不能是只读账号")
 		return
 	}
 	id := pathID(r, "id")
@@ -604,23 +684,23 @@ func (s *Server) saveAdmin(w http.ResponseWriter, r *http.Request, me store.Admi
 			fail(w, 400, "新管理员需要用户名和密码")
 			return
 		}
-		if _, err := s.Store.CreateAdmin(in.Username, hash, in.Root, in.PlatformIDs); err != nil {
+		if _, err := s.Store.CreateAdmin(in.Username, hash, in.Root, in.ReadOnly, in.PlatformIDs); err != nil {
 			fail(w, 400, "创建失败(用户名可能重复): "+err.Error())
 			return
 		}
-		s.audit(me, 0, "", "admin.create", map[string]any{"username": in.Username, "root": in.Root, "platform_ids": in.PlatformIDs})
+		s.audit(me, 0, "", "admin.create", map[string]any{"username": in.Username, "root": in.Root, "read_only": in.ReadOnly, "platform_ids": in.PlatformIDs})
 	} else {
 		if id == me.ID && !in.Root {
 			fail(w, 400, "不能取消自己的 root 权限")
 			return
 		}
-		if err := s.Store.UpdateAdmin(id, hash, in.Root, in.PlatformIDs); err != nil {
+		if err := s.Store.UpdateAdmin(id, hash, in.Root, in.ReadOnly, in.PlatformIDs); err != nil {
 			fail(w, 400, "保存失败: "+err.Error())
 			return
 		}
 		s.dropSessions(id)
 		target, _ := s.Store.Admin(id)
-		s.audit(me, 0, "", "admin.update", map[string]any{"username": target.Username, "root": in.Root, "platform_ids": in.PlatformIDs, "password_changed": hash != ""})
+		s.audit(me, 0, "", "admin.update", map[string]any{"username": target.Username, "root": in.Root, "read_only": in.ReadOnly, "platform_ids": in.PlatformIDs, "password_changed": hash != ""})
 	}
 	writeJSON(w, map[string]bool{"ok": true})
 }

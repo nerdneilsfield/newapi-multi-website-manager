@@ -51,6 +51,8 @@ type Manager struct {
 	Store    *store.Store
 	Log      *zap.Logger
 	Interval time.Duration // minimum gap between requests to one platform
+	// UsageMonths is how many months of usage a collection keeps; older rows are deleted.
+	UsageMonths int
 
 	ctx     context.Context
 	wg      sync.WaitGroup
@@ -63,7 +65,7 @@ type Manager struct {
 // New creates a manager; runs are canceled when ctx is done.
 func New(ctx context.Context, s *store.Store, log *zap.Logger, interval time.Duration) *Manager {
 	return &Manager{
-		Store: s, Log: log, Interval: interval, ctx: ctx,
+		Store: s, Log: log, Interval: interval, UsageMonths: 12, ctx: ctx,
 		clients: map[int64]*newapi.Client{}, busy: map[int64]bool{},
 	}
 }
@@ -142,6 +144,8 @@ func (m *Manager) runJob(id int64) {
 		_, err = m.Refresh(j.PlatformID, &id, "定时:"+j.Name, "cron")
 	case "quota":
 		_, err = m.ApplyQuota(j.PlatformID, &id, "定时:"+j.Name, "cron", *j.Plan)
+	case "usage":
+		_, err = m.CollectUsage(j.PlatformID, &id, "定时:"+j.Name, "cron")
 	}
 	if errors.Is(err, ErrBusy) {
 		if rid, e := m.Store.CreateRun(j.PlatformID, &id, j.Kind, "定时:"+j.Name, "cron"); e == nil {
@@ -258,6 +262,66 @@ func (m *Manager) Refresh(platformID int64, jobID *int64, title, by string) (int
 		sort.Slice(st.Groups, func(i, j int) bool { return st.Groups[i].Name < st.Groups[j].Name })
 		b, _ := json.Marshal(st)
 		return 1, 1, nil, m.Store.SaveSnapshot(platformID, b)
+	})
+}
+
+// usageChunk is how much time one request to new-api covers. /api/data/ has no range limit and
+// returns one row per model and hour, so a long backfill goes in month-sized pieces: a year is a
+// dozen requests per endpoint, and a failure halfway resumes from the last piece saved.
+const usageChunk = 30 * 24 * time.Hour
+
+// usageOverlap is how far back each collection starts again: new-api adds to an hour for a while
+// after it ends, because it flushes its counters on an interval.
+const usageOverlap = 2 * time.Hour
+
+// CollectUsage copies the platform's hourly usage into the store, from where the last collection
+// stopped (the first one fetches everything it keeps), and drops what is older than UsageMonths.
+func (m *Manager) CollectUsage(platformID int64, jobID *int64, title, by string) (int64, error) {
+	if title == "" {
+		title = "采集用量"
+	}
+	return m.launch(platformID, jobID, "usage", title, by, func(ctx context.Context, c *newapi.Client, report progress) (int, int, []string, error) {
+		qpu, err := c.QuotaPerUnit(ctx)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		now := time.Now()
+		keepFrom := now.AddDate(0, -m.UsageMonths, 0).Unix()
+		from := keepFrom
+		if st, err := m.Store.UsageState(platformID); err == nil {
+			from = max(keepFrom, st.CollectedTo-int64(usageOverlap/time.Second))
+		}
+		hourNow := now.Unix() - now.Unix()%3600 // the hour in progress is fetched again next time
+		step := int64(usageChunk / time.Second)
+		total := int((now.Unix()-from)/step) + 1
+		fail := func(done int, err error) (int, int, []string, error) {
+			return total, done, nil, fmt.Errorf("读取用量失败(PAT 需要 log:read,站点需开启数据看板): %w", err)
+		}
+		// Each chunk is saved with its own watermark, so a long backfill that fails halfway resumes there.
+		for lo, done := from, 0; lo <= now.Unix(); lo, done = lo+step, done+1 {
+			hi := min(lo+step-1, now.Unix())
+			mrows, err := c.UsageByModel(ctx, lo, hi)
+			if err != nil {
+				return fail(done, err)
+			}
+			urows, err := c.UsageByUser(ctx, lo, hi)
+			if err != nil {
+				return fail(done, err)
+			}
+			models := make([]store.UsageHour, 0, len(mrows))
+			for _, r := range mrows {
+				models = append(models, store.UsageHour{T: r.CreatedAt, Model: r.ModelName, Count: r.Count, Quota: r.Quota, Tokens: r.TokenUsed})
+			}
+			users := make([]store.UserHour, 0, len(urows))
+			for _, r := range urows {
+				users = append(users, store.UserHour{T: r.CreatedAt, Username: r.Username, Count: r.Count, Quota: r.Quota, Tokens: r.TokenUsed})
+			}
+			if err := m.Store.SaveUsage(platformID, store.UsageState{CollectedTo: min(hi+1, hourNow), QuotaPerUnit: qpu}, models, users); err != nil {
+				return total, done, nil, err
+			}
+			report(total, done+1, 0)
+		}
+		return total, total, nil, m.Store.PruneUsage(platformID, keepFrom)
 	})
 }
 

@@ -50,7 +50,7 @@ type quotaArg struct {
 
 type jobBody struct {
 	Name    string   `json:"name" jsonschema:"任务名称"`
-	Kind    string   `json:"kind" jsonschema:"refresh 刷新统计，quota 调整余额"`
+	Kind    string   `json:"kind" jsonschema:"refresh 刷新统计，usage 采集用量，quota 调整余额"`
 	Spec    string   `json:"spec" jsonschema:"5 段 cron，或 @every 1h"`
 	Enabled bool     `json:"enabled" jsonschema:"是否启用；false 时任务只保存，不会按时执行"`
 	Plan    *planArg `json:"plan,omitempty" jsonschema:"kind 为 quota 时必填，字段同 adjust_quota"`
@@ -69,6 +69,14 @@ type updateJobArg struct {
 
 type auditArg struct {
 	Before int64 `json:"before,omitempty" jsonschema:"上一页最后一条的 id，返回比它更早的记录"`
+}
+
+type usageArg struct {
+	PlatformID int64  `json:"platform_id" jsonschema:"平台 ID，来自 list_platforms"`
+	From       int64  `json:"from,omitempty" jsonschema:"起点，Unix 秒；默认 30 天前"`
+	To         int64  `json:"to,omitempty" jsonschema:"终点(不含)，Unix 秒；默认现在"`
+	Step       string `json:"step,omitempty" jsonschema:"day 按天(默认)或 hour 按小时(最多 14 天)"`
+	TZ         int    `json:"tz,omitempty" jsonschema:"时区，东区为正的分钟数，决定「天」的边界；默认 0 即 UTC"`
 }
 
 type none struct{}
@@ -136,6 +144,23 @@ func (s *Server) mcpHandler(rest http.Handler) http.Handler {
 	mcp.AddTool(srv, tool("adjust_quota", "修改某几个用户或整个分组的余额。会真实改动 new-api 上的余额，add 和 subtract 不是幂等的，重复调用会重复生效；需要幂等时用 override。立即返回 run_id，用 list_runs 查看结果。"),
 		func(ctx context.Context, _ *mcp.CallToolRequest, a quotaArg) (*mcp.CallToolResult, any, error) {
 			return call(ctx, "POST", pid(a.PlatformID)+"/quota", nil, a.planArg)
+		})
+	mcp.AddTool(srv, tool("get_usage", "读取已采集的用量：按模型和按用户、按天或按小时的请求数、额度(new-api 原始单位，除以 state.quota_per_unit 得金额)和 token 数。数据来自 collect_usage 的定时采集，state.collected_to 是已采集到的时间。趋势、排行、峰值、集中度等分析请自行基于这些行计算。"),
+		func(ctx context.Context, _ *mcp.CallToolRequest, a usageArg) (*mcp.CallToolResult, any, error) {
+			q := url.Values{}
+			for k, v := range map[string]int64{"from": a.From, "to": a.To, "tz": int64(a.TZ)} {
+				if v != 0 {
+					q.Set(k, strconv.FormatInt(v, 10))
+				}
+			}
+			if a.Step != "" {
+				q.Set("step", a.Step)
+			}
+			return call(ctx, "GET", pid(a.PlatformID)+"/usage", q, nil)
+		})
+	mcp.AddTool(srv, tool("collect_usage", "开始采集平台用量。立即返回 run_id，在后台增量拉取，用 list_runs 查看进度。需要平台令牌有 log:read 权限。"),
+		func(ctx context.Context, _ *mcp.CallToolRequest, a platformArg) (*mcp.CallToolResult, any, error) {
+			return call(ctx, "POST", pid(a.PlatformID)+"/usage/collect", nil, nil)
 		})
 	mcp.AddTool(srv, tool("list_runs", "列出平台最近 50 次执行（刷新、调额），新的在前，含状态、成功数、失败数和错误。"),
 		func(ctx context.Context, _ *mcp.CallToolRequest, a platformArg) (*mcp.CallToolResult, any, error) {

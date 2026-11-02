@@ -69,11 +69,12 @@ type Admin struct {
 	Username    string  `db:"username"`
 	PassHash    string  `db:"pass_hash"`
 	IsRoot      bool    `db:"is_root"`
+	ReadOnly    bool    `db:"read_only"` // may read what its grants reach, never change it
 	APIToken    string  `db:"api_token"` // "" when the admin has none
 	PlatformIDs []int64 `db:"-"`
 }
 
-const adminCols = `id,username,pass_hash,is_root,api_token`
+const adminCols = `id,username,pass_hash,is_root,read_only,api_token`
 
 func (s *Store) grants(a *Admin) error {
 	return sqlscan.Select(context.Background(), s.db, &a.PlatformIDs, `SELECT platform_id FROM admin_platforms WHERE admin_id=? ORDER BY platform_id`, a.ID)
@@ -128,13 +129,13 @@ func setGrants(tx *sql.Tx, adminID int64, platformIDs []int64) error {
 }
 
 // CreateAdmin inserts an admin with its platform grants.
-func (s *Store) CreateAdmin(username, hash string, root bool, platformIDs []int64) (int64, error) {
+func (s *Store) CreateAdmin(username, hash string, root, readOnly bool, platformIDs []int64) (int64, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return 0, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	res, err := tx.Exec(`INSERT INTO admins(username,pass_hash,is_root) VALUES(?,?,?)`, username, hash, root)
+	res, err := tx.Exec(`INSERT INTO admins(username,pass_hash,is_root,read_only) VALUES(?,?,?,?)`, username, hash, root, readOnly)
 	if err != nil {
 		return 0, err
 	}
@@ -146,13 +147,13 @@ func (s *Store) CreateAdmin(username, hash string, root bool, platformIDs []int6
 }
 
 // UpdateAdmin changes root flag, grants and (when hash != "") the password hash, which also revokes the admin's API token.
-func (s *Store) UpdateAdmin(id int64, hash string, root bool, platformIDs []int64) error {
+func (s *Store) UpdateAdmin(id int64, hash string, root, readOnly bool, platformIDs []int64) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.Exec(`UPDATE admins SET is_root=? WHERE id=?`, root, id); err != nil {
+	if _, err := tx.Exec(`UPDATE admins SET is_root=?, read_only=? WHERE id=?`, root, readOnly, id); err != nil {
 		return err
 	}
 	if hash != "" {

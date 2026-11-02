@@ -88,7 +88,7 @@ func TestAdminWithoutATokenIsNotFoundByTheEmptyToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = s.Close() }()
-	if _, err = s.CreateAdmin("bob", "h", false, nil); err != nil {
+	if _, err = s.CreateAdmin("bob", "h", false, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	if a, aerr := s.AdminByToken(""); !errors.Is(aerr, sql.ErrNoRows) {
@@ -100,7 +100,7 @@ func TestAdminWithoutATokenIsNotFoundByTheEmptyToken(t *testing.T) {
 	if err = s.SetAPIToken(1, "napm_x"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.CreateAdmin("carol", "h", false, nil); err != nil {
+	if _, err = s.CreateAdmin("carol", "h", false, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.SetAPIToken(2, "napm_x"); err == nil {

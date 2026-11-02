@@ -225,3 +225,34 @@ func snippet(b []byte) string {
 	}
 	return s
 }
+
+// Usage is one row of new-api's dashboard data: an hour of usage by one model or one user.
+// CreatedAt is the Unix time of the start of the hour.
+type Usage struct {
+	Username  string `json:"username"`
+	ModelName string `json:"model_name"`
+	CreatedAt int64  `json:"created_at"`
+	Count     int64  `json:"count"`
+	Quota     int64  `json:"quota"`
+	TokenUsed int64  `json:"token_used"`
+}
+
+// UsageByModel returns the hourly usage per model in [from, to] (Unix seconds, both ends included).
+// It needs the log:read scope and a site with data export on; otherwise it is empty.
+func (c *Client) UsageByModel(ctx context.Context, from, to int64) ([]Usage, error) {
+	return c.usage(ctx, "/api/data/", from, to)
+}
+
+// UsageByUser returns the hourly usage per user in [from, to].
+func (c *Client) UsageByUser(ctx context.Context, from, to int64) ([]Usage, error) {
+	return c.usage(ctx, "/api/data/users", from, to)
+}
+
+func (c *Client) usage(ctx context.Context, path string, from, to int64) ([]Usage, error) {
+	q := url.Values{"start_timestamp": {strconv.FormatInt(from, 10)}, "end_timestamp": {strconv.FormatInt(to, 10)}}
+	var rows []Usage
+	if err := c.do(ctx, http.MethodGet, path, q, nil, &rows); err != nil {
+		return nil, err
+	}
+	return rows, nil
+}

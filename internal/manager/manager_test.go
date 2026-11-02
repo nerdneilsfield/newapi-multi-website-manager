@@ -2,10 +2,14 @@ package manager
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -21,6 +25,9 @@ type fakeNewAPI struct {
 	mu    sync.Mutex
 	quota map[int64]int64
 	calls []map[string]any
+	usage []map[string]any // rows served by /api/data/ and /api/data/users, filtered by the requested range
+	noLog bool             // answer the usage endpoints as a token without log:read
+	asked [][2]int64       // the ranges requested from /api/data/
 }
 
 func (f *fakeNewAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +72,23 @@ func (f *fakeNewAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			f.quota[id] = v
 		}
 		ok(nil)
+	case "/api/data/", "/api/data/users":
+		if f.noLog {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		from, _ := strconv.ParseInt(r.URL.Query().Get("start_timestamp"), 10, 64)
+		to, _ := strconv.ParseInt(r.URL.Query().Get("end_timestamp"), 10, 64)
+		if r.URL.Path == "/api/data/" {
+			f.asked = append(f.asked, [2]int64{from, to})
+		}
+		rows := []map[string]any{}
+		for _, u := range f.usage {
+			if t := int64(u["created_at"].(int64)); t >= from && t <= to {
+				rows = append(rows, u)
+			}
+		}
+		ok(rows)
 	case "/api/user/1":
 		ok(map[string]any{"id": 1, "username": "a", "group": "default", "quota": f.quota[1]})
 	default:
@@ -205,5 +229,93 @@ func TestValidatePlan(t *testing.T) {
 	}
 	if ValidatePlan(store.QuotaPlan{Mode: "override", Amount: 0, Unit: "quota", Group: "g"}) != nil {
 		t.Error("override 0 should be valid")
+	}
+}
+
+func TestCollectUsageIsIncrementalAndKeepsOnlyTheRetention(t *testing.T) {
+	m, st, fake, pid := setup(t)
+	now := time.Now().Unix()
+	hour := now - now%3600
+	old := time.Now().AddDate(0, -13, 0).Unix() // beyond the 12 months kept
+	fake.usage = []map[string]any{
+		{"created_at": old - old%3600, "model_name": "gpt", "username": "a", "count": 9, "quota": 9, "token_used": 9},
+		{"created_at": hour - 5*3600, "model_name": "gpt", "username": "a", "count": 2, "quota": 20, "token_used": 200},
+		{"created_at": hour - 3600, "model_name": "gpt", "username": "b", "count": 1, "quota": 10, "token_used": 100},
+	}
+	collect := func() store.Run {
+		id, err := m.CollectUsage(pid, nil, "", "test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return waitRun(t, st, id)
+	}
+	if r := collect(); r.Status != "ok" {
+		t.Fatalf("first run: %+v", r)
+	}
+	models, _ := st.UsageModels(pid, 0, now+3600, false, 0)
+	if len(models) != 2 || models[0].Quota != 20 || models[1].Quota != 10 {
+		t.Fatalf("models after the first run (the 13-month-old row must not be kept): %+v", models)
+	}
+	users, _ := st.UsageUsers(pid, 0, now+3600, true, 0)
+	var sum int64
+	for _, u := range users {
+		sum += u.Quota
+	}
+	if sum != 30 {
+		t.Fatalf("users by day: %+v", users)
+	}
+	state, err := st.UsageState(pid)
+	if err != nil || state.CollectedTo != hour || state.QuotaPerUnit != 500000 {
+		t.Fatalf("state: %+v %v", state, err)
+	}
+
+	// The second run asks only from shortly before the watermark, and an hour fetched again
+	// replaces its old row instead of adding to it.
+	fake.asked = nil
+	fake.usage[2]["quota"], fake.usage[2]["count"] = 15, 2
+	if r := collect(); r.Status != "ok" {
+		t.Fatalf("second run: %+v", r)
+	}
+	if len(fake.asked) != 1 || fake.asked[0][0] != hour-int64(usageOverlap/time.Second) {
+		t.Fatalf("second run asked for %v, want one request from %d", fake.asked, hour-int64(usageOverlap/time.Second))
+	}
+	models, _ = st.UsageModels(pid, 0, now+3600, false, 0)
+	if len(models) != 2 || models[1].Quota != 15 || models[1].Count != 2 {
+		t.Fatalf("models after the second run: %+v", models)
+	}
+}
+
+func TestCollectUsageWithoutLogScopeFailsAndKeepsTheWatermark(t *testing.T) {
+	m, st, fake, pid := setup(t)
+	fake.noLog = true
+	id, _ := m.CollectUsage(pid, nil, "", "test")
+	r := waitRun(t, st, id)
+	if r.Status != "failed" || !strings.Contains(r.Errors, "log:read") {
+		t.Fatalf("run: %+v", r)
+	}
+	if _, err := st.UsageState(pid); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("a failed first run moved the watermark: %v", err)
+	}
+}
+
+func TestCollectUsageDropsRowsOlderThanTheRetention(t *testing.T) {
+	m, st, _, pid := setup(t)
+	old := time.Now().AddDate(0, -20, 0).Unix()
+	old -= old % 3600
+	if err := st.SaveUsage(pid, store.UsageState{CollectedTo: old + 3600, QuotaPerUnit: 1},
+		[]store.UsageHour{{T: old, Model: "gpt", Count: 1, Quota: 1, Tokens: 1}},
+		[]store.UserHour{{T: old, Username: "a", Count: 1, Quota: 1, Tokens: 1}}); err != nil {
+		t.Fatal(err)
+	}
+	m.UsageMonths = 12
+	id, _ := m.CollectUsage(pid, nil, "", "test")
+	if r := waitRun(t, st, id); r.Status != "ok" {
+		t.Fatalf("run: %+v", r)
+	}
+	if ms, _ := st.UsageModels(pid, 0, time.Now().Unix(), false, 0); len(ms) != 0 {
+		t.Errorf("model rows kept: %+v", ms)
+	}
+	if us, _ := st.UsageUsers(pid, 0, time.Now().Unix(), false, 0); len(us) != 0 {
+		t.Errorf("user rows kept: %+v", us)
 	}
 }

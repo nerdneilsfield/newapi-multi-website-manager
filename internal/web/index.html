@@ -114,6 +114,23 @@ pre { margin: var(--space-2xs) 0 0; white-space: pre-wrap; font-family: var(--fo
 .fig span { color: var(--color-muted); }
 @media (max-width: 40rem) { .fig { padding: var(--space-sm) var(--space-md); } .fig b { font-size: var(--text-lg); } }
 
+.chart { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { font-family: var(--font-outlier); font-size: 11px; fill: var(--color-muted); font-variant-numeric: tabular-nums; }
+.chart .grid { stroke: var(--color-rule); stroke-width: 1; }
+.chart .bar { fill: var(--color-accent); }
+.chart .bar.dim { fill: var(--color-muted-2); }
+.chart .bar.hot { fill: var(--color-accent); stroke: var(--color-ink); stroke-width: 1; }
+.chart .ma { fill: none; stroke: var(--color-ink); stroke-width: 2; }
+.chart .hit { fill: transparent; }
+.chart .hit:hover + .bar, .chart .hit:focus + .bar { fill: var(--color-focus); }
+.swatches { display: flex; flex-wrap: wrap; gap: var(--space-md); color: var(--color-muted); margin-block: var(--space-xs) var(--space-md); }
+.swatches i { display: inline-block; width: 10px; height: 10px; margin-right: var(--space-2xs); background: var(--color-accent); vertical-align: baseline; }
+.swatches i.m { background: none; border-top: 2px solid var(--color-ink); height: 0; vertical-align: middle; }
+.insights { list-style: none; margin: 0 0 var(--space-lg); padding: 0; display: grid; gap: var(--space-sm); max-width: 75ch; }
+.insights li { padding-left: var(--space-md); border-left: 2px solid var(--color-accent); }
+.insights li b { font-weight: 500; }
+.hbar { display: flex; height: 8px; background: var(--color-rule-2); min-width: 6rem; } .hbar i { display: block; background: var(--color-accent); }
+td.d-up { color: var(--color-ink); } td.d-dn { color: var(--color-muted); }
 .empty { border: 1px dashed var(--color-muted-2); padding: var(--space-lg); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
 .fail { border: 1px solid var(--color-error); padding: var(--space-md); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); color: var(--color-error); white-space: pre-wrap; }
 .sk { display: grid; gap: var(--space-xs); }
@@ -132,7 +149,7 @@ pre { margin: var(--space-2xs) 0 0; white-space: pre-wrap; font-family: var(--fo
 const D={
 zh:{
 app:'new-api 多平台管理',user:'用户名',pass:'密码',login:'登录',logout:'退出',langTo:'English',platform:'平台',loading:'加载中…',retry:'重试',
-'tab.stats':'统计','tab.users':'用户','tab.quota':'调整余额','tab.jobs':'定时任务','tab.runs':'执行记录','tab.audit':'操作记录','tab.tokens':'令牌','tab.platforms':'平台管理','tab.admins':'管理员',
+'tab.stats':'统计','tab.usage':'用量','tab.users':'用户','tab.quota':'调整余额','tab.jobs':'定时任务','tab.runs':'执行记录','tab.audit':'操作记录','tab.tokens':'令牌','tab.platforms':'平台管理','tab.admins':'管理员',
 noPlatRoot:'还没有平台，请到「平台管理」添加。',noPlatUser:'你还没有被授权任何平台，请联系 root 管理员。',addPlat:'添加平台',
 refresh:'刷新统计',refreshing:'刷新中…',updatedAt:'更新于 {t}',noData:'尚无数据',lastFail:'上次刷新: {s}\n{e}',
 users:'用户数',totalBal:'总余额',totalUsed:'总用量',requests:'请求数',group:'分组',balance:'余额',used:'用量',
@@ -145,7 +162,7 @@ op:'方式',amount:'数值',unit:'单位',target:'对象',unitUsdL:'美元(按�
 tgtGroup:'整个分组',tgtUsers:'指定用户 ID',groupName:'分组名',userIds:'用户 ID，逗号分隔',
 eAmount:'请输入有效数值',eGroup:'请输入分组名',eIds:'用户 ID 无效',
 jobs:'定时任务',name:'名称',kind:'类型',spec:'表达式',content:'内容',enabled:'启用',del:'删除',
-'kind.quota':'调整余额','kind.refresh':'刷新统计','kind.quotaS':'调额','kind.refreshS':'刷新',
+'kind.quota':'调整余额','kind.refresh':'刷新统计','kind.usage':'采集用量','kind.quotaS':'调额','kind.refreshS':'刷新','kind.usageS':'用量',
 delJob:'删除任务 {n}？',noJobs:'暂无任务',addJob:'新增任务',jobName:'任务名称',cron:'cron',
 cronHint:'5 段 cron(分 时 日 月 周)，或 @every 6h、@daily；使用服务器本地时区。',
 addWarn:'提示：定时「增加」不是幂等的，同一时刻重复触发会重复加；需要固定结果请用「设为」。',
@@ -163,12 +180,24 @@ tokGen:'生成令牌',tokRegen:'重新生成',tokNone:'还没有令牌',tokCopy:
 platforms:'平台',tokenKeep:'留空保持不变',save:'保存',saved:'已保存',delPlat:'删除平台 {n} 及其任务和记录？',noPlats:'暂无平台',addPlatH:'新增平台',
 patHint:'Token 用目标站「安全设置 → Access Tokens」创建的 PAT，需要权限 user:read、user:write、group:read。目标站版本需 ≥ v1.0.0-rc.41。',
 add:'添加',
-admins:'管理员',adminHint:'非 root 管理员只能看到并操作被勾选的平台；root 可管理全部平台与管理员。改密码或权限会使该管理员的登录失效，改密码还会使他的令牌失效。',tokCol:'令牌',
+admins:'管理员',adminHint:'非 root 管理员只能看到并操作被勾选的平台；root 可管理全部平台与管理员。改密码或权限会使该管理员的登录失效，改密码还会使他的令牌失效。',tokCol:'令牌',model:'模型',
+usageNone:'还没有采集过用量。采集需要平台令牌带 log:read 权限，且站点开启了数据看板。',usageCollect:'采集用量',usageFail:'上次采集: {s}\n{e}',usageCollecting:'采集中…',usageTo:'数据已采集到 {t}',
+range:'范围',lastDays:'最近 {n} 天',vsPrev:'与前 {n} 天相比',spend:'消耗',reqs:'请求',tokensL:'Token',activeU:'活跃用户',
+dailySpend:'每日消耗',avg7:'7 日均线',peakDay:'高于常态的一天',byModel:'按模型',byUser:'按用户',share:'占比',change:'变化',newTag:'新增',
+dayPartial:'今天还没过完，不计入',hourOfDay:'一天里的请求分布(本地时间)',insights:'看点',
+iSpend:'最近 {n} 天消耗 <b>{v}</b>，{cmp}。',iUp:'比前 {n} 天多 {p}%',iDown:'比前 {n} 天少 {p}%',iFlat:'与前 {n} 天基本持平',iNoPrev:'更早的数据还不够，无法比较',
+iRun:'按最近 7 天的日均，一个月约 <b>{v}</b>。',
+iSpike:'<b>{d}</b> 的消耗是常态的 {x} 倍，值得看一眼。',iNoSpike:'这段时间没有明显的异常日。',
+iTop:'<b>{n}</b> 一个就占了 {p}% 的消耗，前 3 位合计 {p3}%。',iTopModel:'模型里 <b>{n}</b> 占 {p}%。',
+iUp1:'涨得最多的是 <b>{n}</b>，多 {v}。',iDown1:'降得最多的是 <b>{n}</b>，少 {v}。',iNew:'新出现的用户 {a} 个，之后没再出现的用户 {b} 个。',
+iQuiet:'每天 <b>{a}</b> 前后最安静，适合安排停机或批量调额；最忙在 <b>{b}</b>。',
+iWeekend:'周末的消耗只有工作日的 {p}%。',iWeekendUp:'周末的消耗是工作日的 {p}%。',
+sample:'数据按小时计，需要先采集；最新的一小时可能还在变。',roTag:'只读',roHint:'只读账号和其他管理员一样按平台授权，但只能查看：不能刷新、调额、改任务，也不能增删平台和管理员，令牌同样只读。只读账号仍可管理自己的令牌。root 不能是只读。',
 adminPlats:'可管理的平台',pwKeep:'留空不改',pwNew:'密码(≥8位)',create:'新增',delAdmin:'删除 {n}？'
 },
 en:{
 app:'new-api multi-site manager',user:'Username',pass:'Password',login:'Sign in',logout:'Sign out',langTo:'中文',platform:'Platform',loading:'Loading…',retry:'Retry',
-'tab.stats':'Stats','tab.users':'Users','tab.quota':'Adjust balance','tab.jobs':'Schedules','tab.runs':'Runs','tab.audit':'Audit log','tab.tokens':'Tokens','tab.platforms':'Platforms','tab.admins':'Admins',
+'tab.stats':'Stats','tab.usage':'Usage','tab.users':'Users','tab.quota':'Adjust balance','tab.jobs':'Schedules','tab.runs':'Runs','tab.audit':'Audit log','tab.tokens':'Tokens','tab.platforms':'Platforms','tab.admins':'Admins',
 noPlatRoot:'No platforms yet. Add one under Platforms.',noPlatUser:'You have not been granted any platform. Ask a root admin.',addPlat:'Add a platform',
 refresh:'Refresh stats',refreshing:'Refreshing…',updatedAt:'Updated {t}',noData:'No data yet',lastFail:'Last refresh: {s}\n{e}',
 users:'Users',totalBal:'Total balance',totalUsed:'Total usage',requests:'Requests',group:'Group',balance:'Balance',used:'Usage',
@@ -181,7 +210,7 @@ op:'Operation',amount:'Amount',unit:'Unit',target:'Target',unitUsdL:'USD (conver
 tgtGroup:'Whole group',tgtUsers:'Specific user IDs',groupName:'Group name',userIds:'User IDs, comma separated',
 eAmount:'Enter a valid amount',eGroup:'Enter a group name',eIds:'Invalid user ID',
 jobs:'Schedules',name:'Name',kind:'Type',spec:'Schedule',content:'Content',enabled:'Enabled',del:'Delete',
-'kind.quota':'Adjust balance','kind.refresh':'Refresh stats','kind.quotaS':'Adjust','kind.refreshS':'Refresh',
+'kind.quota':'Adjust balance','kind.refresh':'Refresh stats','kind.usage':'Collect usage','kind.quotaS':'Adjust','kind.refreshS':'Refresh','kind.usageS':'Usage',
 delJob:'Delete job {n}?',noJobs:'No jobs yet',addJob:'Add job',jobName:'Job name',cron:'cron',
 cronHint:'5-field cron (min hour day month weekday), or @every 6h, @daily. Uses the server’s local time zone.',
 addWarn:'Note: a scheduled “Add” is not idempotent. A repeated trigger adds again. Use “Set to” for a fixed result.',
@@ -199,14 +228,26 @@ tokGen:'Generate token',tokRegen:'Regenerate',tokNone:'No token yet',tokCopy:'Co
 platforms:'Platforms',tokenKeep:'Leave empty to keep',save:'Save',saved:'Saved',delPlat:'Delete platform {n} with its jobs and runs?',noPlats:'No platforms yet',addPlatH:'Add platform',
 patHint:'Use a PAT created on the target site under Security Settings → Access Tokens, with scopes user:read, user:write and group:read. The site must be v1.0.0-rc.41 or later.',
 add:'Add',
-admins:'Admins',adminHint:'A non-root admin sees and operates only the ticked platforms. Root manages all platforms and admins. Changing a password or permissions signs that admin out, and a password change also revokes their token.',tokCol:'Token',
+admins:'Admins',adminHint:'A non-root admin sees and operates only the ticked platforms. Root manages all platforms and admins. Changing a password or permissions signs that admin out, and a password change also revokes their token.',tokCol:'Token',model:'Model',
+usageNone:'No usage collected yet. Collecting needs the platform token to have log:read, and the site to have its data dashboard on.',usageCollect:'Collect usage',usageFail:'Last collection: {s}\n{e}',usageCollecting:'Collecting…',usageTo:'Collected up to {t}',
+range:'Range',lastDays:'Last {n} days',vsPrev:'vs the {n} days before',spend:'Spend',reqs:'Requests',tokensL:'Tokens',activeU:'Active users',
+dailySpend:'Spend per day',avg7:'7-day average',peakDay:'Day above the usual',byModel:'By model',byUser:'By user',share:'Share',change:'Change',newTag:'new',
+dayPartial:'Today is not over, so it is not counted',hourOfDay:'Requests across the day (local time)',insights:'What stands out',
+iSpend:'Spend over the last {n} days is <b>{v}</b>, {cmp}.',iUp:'{p}% more than the {n} days before',iDown:'{p}% less than the {n} days before',iFlat:'about the same as the {n} days before',iNoPrev:'there is not enough earlier data to compare',
+iRun:'At the last 7 days\' daily average, a month comes to about <b>{v}</b>.',
+iSpike:'Spend on <b>{d}</b> was {x}x the usual, worth a look.',iNoSpike:'No day stood out in this period.',
+iTop:'<b>{n}</b> alone is {p}% of spend, and the top 3 together {p3}%.',iTopModel:'Among models, <b>{n}</b> takes {p}%.',
+iUp1:'The biggest rise is <b>{n}</b>, up {v}.',iDown1:'The biggest drop is <b>{n}</b>, down {v}.',iNew:'New users: {a}. Users who did not appear again: {b}.',
+iQuiet:'Around <b>{a}</b> is the quietest time each day, a good window for maintenance or bulk adjustments; the busiest is <b>{b}</b>.',
+iWeekend:'Weekend spend is only {p}% of a weekday.',iWeekendUp:'Weekend spend is {p}% of a weekday.',
+sample:'Data is hourly and must be collected first; the latest hour may still change.',roTag:'Read-only',roHint:'A read-only account is granted platforms like any other admin but can only look: it cannot refresh, adjust balances, change jobs, or add or delete platforms and admins, and its token is read-only too. It can still manage its own token. Root cannot be read-only.',
 adminPlats:'Platforms they can manage',pwKeep:'Leave empty to keep',pwNew:'Password (8+ chars)',create:'Add',delAdmin:'Delete {n}?'
 }};
 // Messages the server sends in Chinese, keyed by the exact text or by prefix.
 const SRV={
 '密码至少 8 位':'Password must be at least 8 characters','需要 application/json':'Content-Type must be application/json',
 '需要名称和以 http(s):// 开头的 URL(不能带用户名密码)':'A name and a URL starting with http(s):// are required (no username or password in the URL)',
-'需要 plan':'A plan is required','需要 root 管理员':'Root admin required','令牌无效':'Invalid token','令牌不能管理令牌和管理员账号，请登录网页后操作':'A token cannot manage tokens or admin accounts; sign in to the web page','只能管理自己的令牌':'You can manage only your own token','管理员不存在':'Admin not found','无法生成令牌':'Could not generate a token','不能取消自己的 root 权限':'You cannot remove your own root permission',
+'需要 plan':'A plan is required','需要 root 管理员':'Root admin required','令牌无效':'Invalid token','令牌不能管理令牌和管理员账号，请登录网页后操作':'A token cannot manage tokens or admin accounts; sign in to the web page','只能管理自己的令牌':'You can manage only your own token','只读账号不能修改数据':'A read-only account cannot change data','root 不能是只读账号':'Root cannot be read-only','管理员不存在':'Admin not found','无法生成令牌':'Could not generate a token','不能取消自己的 root 权限':'You cannot remove your own root permission',
 '新平台需要 token':'A new platform needs a token','未登录':'Not signed in','平台不存在':'Platform not found','请求格式错误':'Malformed request',
 '跨站请求被拒绝':'Cross-site request rejected','用户名或密码错误':'Wrong username or password','尝试次数过多，请稍后再试':'Too many attempts, try again later',
 '密码过长(bcrypt 上限 72 字节)':'Password too long (bcrypt limit is 72 bytes)','kind 必须是 refresh 或 quota':'kind must be refresh or quota',
@@ -220,7 +261,7 @@ const SRVP=[['保存失败(名称可能重复): ','Save failed (the name may alr
 const S={me:null,platforms:[],cur:null,tab:'stats',lang:'zh'};
 try{S.lang=localStorage.getItem('napm.lang')||''}catch{}
 if(!D[S.lang])S.lang=(navigator.language||'').toLowerCase().startsWith('zh')?'zh':'en';
-const t=(k,v)=>{let s=D[S.lang][k]??D.zh[k]??k;if(v)for(const[a,b]of Object.entries(v))s=s.replaceAll('{'+a+'}',b);return s};
+const t=(k,v)=>fill(D[S.lang][k]??D.zh[k]??k,v);
 const errText=m=>{if(S.lang==='zh')return m;if(SRV[m])return SRV[m];for(const[a,b]of SRVP)if(m.startsWith(a))return b+m.slice(a.length);return m};
 const loc=()=>S.lang==='zh'?'zh-CN':'en-GB';
 function setLang(l){
@@ -243,7 +284,87 @@ const skeleton=()=>$('div',{className:'sk',role:'status','aria-busy':'true'},$('
 const empty=(msg,btn)=>$('div',{className:'empty'},$('p',{},msg),btn);
 const failBox=(e,retry)=>$('div',{className:'fail',role:'alert'},e.message,retry?$('button',{on:{click:retry}},t('retry')):null);
 
-const TABS=['stats','users','quota','jobs','runs','audit','tokens','platforms','admins'];
+// <analysis>
+// Everything on the usage page is computed here, in the browser, from the rows the server stores.
+// day: the /usage answer by day (the n complete days before today and the n before those, plus today);
+// hours: its answer by hour. today is the local midnight of today and off the zone's seconds east of UTC.
+// hours is only as long as the server allows (14 days), so for 30 days the hour-of-day view covers the last 14.
+// shortcut: one fixed UTC offset for the whole range, so across a DST change a day can start an hour off.
+const median=a=>{if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2};
+function analyze(day,hours,n,today,off){
+  const D=86400,lo=today-n*D,plo=lo-n*D;
+  const sum=(rows,a,b,key)=>{const m=new Map();for(const r of rows)if(r.t>=a&&r.t<b){const k=key?r[key]:r.t,x=m.get(k)||{quota:0,count:0,tokens:0};x.quota+=r.quota;x.count+=r.count;x.tokens+=r.tokens;m.set(k,x)}return m};
+  const tot=m=>{const o={quota:0,count:0,tokens:0,n:0};for(const x of m.values()){o.quota+=x.quota;o.count+=x.count;o.tokens+=x.tokens;if(x.quota>0||x.count>0)o.n++}return o};
+  const days=sum(day.models,plo,today+D);
+  const daily=[];for(let i=0;i<n;i++){const t=lo+i*D;daily.push({t,v:days.get(t)?.quota||0,count:days.get(t)?.count||0})}
+  const todayRow=days.get(today)||{quota:0,count:0};
+  const ma=daily.map((_,i)=>i<6?null:daily.slice(i-6,i+1).reduce((a,d)=>a+d.v,0)/7);
+  const med=median(daily.map(d=>d.v)),scale=Math.max(1.4826*median(daily.map(d=>Math.abs(d.v-med))),.25*med);
+  const anomalies=med>0&&n>=7?daily.filter(d=>d.v>med+3*scale).map(d=>({t:d.t,v:d.v,ratio:d.v/med})):[];
+  const cur=tot(sum(day.models,lo,today)),prev=tot(sum(day.models,plo,lo));
+  const curU=sum(day.users,lo,today,'username'),prevU=sum(day.users,plo,lo,'username');
+  cur.n=tot(curU).n;prev.n=tot(prevU).n;
+  const rank=(m,p)=>[...m].map(([name,x])=>({name,...x,prev:p.get(name)?.quota||0})).sort((a,b)=>b.quota-a.quota);
+  const models=rank(sum(day.models,lo,today,'model'),sum(day.models,plo,lo,'model'));
+  const users=rank(curU,prevU);
+  const hasPrev=prev.count>0&&prev.quota>0; // a free previous period has nothing to compare against
+  let movers=null;
+  if(hasPrev){
+    const names=new Set([...curU.keys(),...prevU.keys()]);
+    const all=[...names].map(k=>({name:k,cur:curU.get(k)?.quota||0,prev:prevU.get(k)?.quota||0})).map(x=>({...x,d:x.cur-x.prev}));
+    const up=all.filter(x=>x.d>0).sort((a,b)=>b.d-a.d)[0],down=all.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0];
+    movers={up,down,fresh:all.filter(x=>x.cur>0&&x.prev===0).length,gone:all.filter(x=>x.prev>0&&x.cur===0).length};
+  }
+  const hod=Array(24).fill(0);for(const r of hours.models)if(r.t>=lo&&r.t<today)hod[Math.floor((((r.t+off)%D+D)%D)/3600)]+=r.count;
+  let quiet=null,peak=null;
+  if(hod.filter(x=>x>0).length>=12){
+    let best=0,bs=Infinity;for(let st=0;st<24;st++){let x=0;for(let i=0;i<4;i++)x+=hod[(st+i)%24];if(x<bs){bs=x;best=st}}
+    quiet=best;peak=hod.indexOf(Math.max(...hod));
+  }
+  let weekend=null;
+  {const we=[],wd=[];for(const d of daily)(new Date((d.t+off)*1000).getUTCDay()%6===0?we:wd).push(d.v);
+   const a=x=>x.reduce((p,c)=>p+c,0)/x.length;
+   if(we.length>=2&&wd.length>=5&&a(wd)>0){const r=a(we)/a(wd);if(r<.75||r>1.33)weekend=r}}
+  const last7=daily.slice(-7).reduce((a,d)=>a+d.v,0)/7;
+  return{n,cur,prev,hasPrev,daily,today:{t:today,v:todayRow.quota},ma,anomalies,models,users,hod,quiet,peak,weekend,movers,runRate:n>=7?last7:null};
+}
+// niceScale picks a round step so the axis has about 4 intervals and ends at or above v.
+// ints keeps the step a whole number, for counts.
+function niceScale(v,ints){
+  if(!(v>0))return{step:1,max:ints?4:1,n:ints?4:1};
+  const raw=v/4,p=10**Math.floor(Math.log10(raw)),m=raw/p;
+  let step=(m<=1?1:m<=2?2:m<=2.5?2.5:m<=5?5:10)*p;if(ints)step=Math.max(1,Math.ceil(step));
+  const n=Math.ceil(v/step-1e-9);return{step,max:step*n,n};
+}
+// </analysis>
+
+
+// ---- charts: plain SVG, written for this data ----
+const NS='http://www.w3.org/2000/svg';
+const sv=(tag,a={},...k)=>{const e=document.createElementNS(NS,tag);for(const[x,v]of Object.entries(a))e.setAttribute(x,v);for(const c of k.flat())if(c!=null)e.append(c);return e};
+// bars(items,{h,fmt,xl,line,ints}): items [{x,v,cls,title}]. Zero baseline, round gridlines, a title on each
+// bar. The viewBox is as wide as the page's content, so text keeps its size at every width.
+function bars(items,{h=200,fmt=nf,xl=i=>items[i].x,line=null,ints=false}={}){
+  const main=document.querySelector('main'),W=Math.max(300,Math.floor(main.clientWidth-2*parseFloat(getComputedStyle(main).paddingLeft))),B=22,T=8,ph=h-B-T;
+  const sc=niceScale(Math.max(0,...items.map(i=>i.v),...(line||[]).map(v=>v||0)),ints),max=sc.max;
+  const ticks=Array.from({length:sc.n+1},(_,i)=>sc.step*i),L=8+7*Math.max(...ticks.map(v=>fmt(v).length)),pw=W-L-4;
+  const bw=pw/items.length,y=v=>T+ph-ph*v/max,svg=sv('svg',{class:'chart',viewBox:`0 0 ${W} ${h}`,role:'img','aria-label':t('dailySpend')});
+  for(const v of ticks)svg.append(sv('line',{class:'grid',x1:L,x2:W-4,y1:y(v),y2:y(v)}),sv('text',{x:L-6,y:y(v)+4,'text-anchor':'end'},fmt(v)));
+  items.forEach((it,i)=>{const x=L+i*bw,top=y(it.v),g=sv('g',{});
+    g.append(sv('title',{},it.title||`${it.x}: ${fmt(it.v)}`),sv('rect',{class:'hit',x,y:T,width:bw,height:ph}),
+      sv('rect',{class:'bar '+(it.cls||''),x:x+Math.max(1,bw*.12),y:top,width:Math.max(1,bw*.76),height:Math.max(0,T+ph-top)}));
+    svg.append(g)});
+  const step=Math.max(1,Math.ceil(items.length/Math.floor(pw/64)));
+  items.forEach((_,i)=>{if(i%step===0)svg.append(sv('text',{x:L+i*bw+bw/2,y:h-6,'text-anchor':'middle'},xl(i)))});
+  if(line){const pts=line.map((v,i)=>v==null?null:`${(L+i*bw+bw/2).toFixed(1)},${y(v).toFixed(1)}`).filter(Boolean);if(pts.length>1)svg.append(sv('polyline',{class:'ma',points:pts.join(' ')}))}
+  return svg;
+}
+// rich turns a translated line into nodes: only the template's own <b>..</b> becomes bold, so a model
+// or user name inside it is always text.
+const rich=(k,v)=>(D[S.lang][k]??D.zh[k]).split(/(<b>.*?<\/b>)/).map(p=>p.startsWith('<b>')?$('b',{},fill(p.slice(3,-4),v)):fill(p,v));
+const fill=(s,v)=>{for(const[a,b]of Object.entries(v||{}))s=s.replaceAll('{'+a+'}',b);return s};
+const pct=(a,b)=>b>0?Math.round(a/b*100):0;
+const TABS=['stats','usage','users','quota','jobs','runs','audit','tokens','platforms','admins'];
 function readHash(){
   const q=new URLSearchParams(location.hash.slice(1));
   if(TABS.includes(q.get('tab')))S.tab=q.get('tab');
@@ -275,13 +396,13 @@ function loginView(){
 }
 function render(){
   clearInterval(timer);
-  const tabs=TABS.filter(k=>S.me.root||!['platforms','admins'].includes(k));
+  const tabs=TABS.filter(k=>(S.me.root||!['platforms','admins'].includes(k))&&!(S.me.read_only&&k==='quota'));
   if(!tabs.includes(S.tab))S.tab='stats';
   const sel=$('select',{'aria-label':t('platform'),on:{change:e=>go({cur:+e.target.value})}},S.platforms.map(p=>$('option',{value:p.id,selected:p.id===S.cur},p.name)));
   const nav=$('nav',{className:'tabs','aria-label':t('app')},$('div',{className:'container'},tabs.map(k=>$('button',{'aria-current':S.tab===k?'page':null,on:{click:()=>go({tab:k})}},t('tab.'+k)))));
   const body=$('main',{className:'container'});
   app.replaceChildren(
-    $('header',{className:'bar'},$('div',{className:'container'},$('h1',{},t('app')),S.platforms.length?sel:null,$('span',{className:'who'},S.me.username+(S.me.root?' (root)':'')),
+    $('header',{className:'bar'},$('div',{className:'container'},$('h1',{},t('app')),S.platforms.length?sel:null,$('span',{className:'who'},S.me.username+(S.me.root?' (root)':S.me.read_only?' ('+t('roTag')+')':'')),
       $('button',{on:{click:()=>setLang(S.lang==='zh'?'en':'zh')}},t('langTo')),
       $('button',{on:{click:async()=>{await api('POST','/api/logout',{});boot()}}},t('logout')))),
     nav,body);
@@ -302,7 +423,7 @@ async stats(el){
   const draw=async()=>{
     const d=await api('GET',P()+'/stats');const s=d.stats,r=d.last_run;
     const run=r&&r.status==='running';
-    const parts=[$('div',{className:'row mid'},$('button',{className:'p',disabled:run,on:{click:async()=>{try{await api('POST',P()+'/refresh',{});track()}catch(e){flash(msg,e.message,1)}}}},run?t('refreshing'):t('refresh')),
+    const parts=[$('div',{className:'row mid'},S.me.read_only?null:$('button',{className:'p',disabled:run,on:{click:async()=>{try{await api('POST',P()+'/refresh',{});track()}catch(e){flash(msg,e.message,1)}}}},run?t('refreshing'):t('refresh')),
         $('span',{className:'mute'},s?t('updatedAt',{t:fmtT(s.at)}):t('noData')),msg)];
     if(r&&r.status!=='running'&&r.kind==='refresh'&&r.status!=='ok')parts.push($('div',{className:'msg bad note'},t('lastFail',{s:t('st.'+r.status),e:r.errors})));
     if(s){const u=s.quota_per_unit;
@@ -316,6 +437,55 @@ async stats(el){
   };
   const track=async()=>{if(await draw())poll(async()=>{if(!await draw())clearInterval(timer)})};
   track();
+},
+async usage(el){
+  const n=S.usageDays||14,d0=new Date();d0.setHours(0,0,0,0);
+  // the offset at today's midnight, not now: the server cuts days with this one offset, so today must start on its boundary
+  const off=-d0.getTimezoneOffset()*60,tz=off/60,today=Math.floor(d0.getTime()/1000);
+  const D=86400,from=today-2*n*D,to=Math.floor(Date.now()/1000)+1;
+  const q=`from=${from}&to=${to}&tz=${tz}`;
+  const [day,hr,runs]=await Promise.all([api('GET',`${P()}/usage?${q}&step=day`),api('GET',`${P()}/usage?from=${Math.max(from,to-14*D)}&to=${to}&tz=${tz}&step=hour`),api('GET',P()+'/runs')]);
+  const run=runs.find(r=>r.kind==='usage');const busy=run&&run.status==='running';
+  const msg=$('span',{className:'msg',role:'status'});
+  const sel=$('select',{'aria-label':t('range'),on:{change:e=>{S.usageDays=+e.target.value;render()}}},[7,14,30].map(k=>$('option',{value:k,selected:k===n},t('lastDays',{n:k}))));
+  const head=$('div',{className:'row mid'},fld(t('range'),sel),
+    S.me.read_only?null:$('button',{className:'p',disabled:busy,on:{click:async()=>{try{await api('POST',P()+'/usage/collect',{});render()}catch(e){flash(msg,e.message,1)}}}},busy?t('usageCollecting'):t('usageCollect')),
+    $('span',{className:'mute'},day.state?t('usageTo',{t:fmtT(day.state.collected_to)}):''),msg);
+  if(busy)poll(()=>render());
+  const fail=run&&run.status!=='running'&&run.status!=='ok'?$('div',{className:'msg bad note'},t('usageFail',{s:t('st.'+run.status),e:run.errors})):null;
+  if(!day.state||(!day.models.length&&!day.users.length))return el.replaceChildren(sec(null,head,fail,empty(t('usageNone'))));
+  const qpu=day.state.quota_per_unit,r=analyze(day,hr,n,today,off),m=v=>money(v,qpu),dateL=ts=>new Date(ts*1000).toLocaleDateString(loc(),{month:'numeric',day:'numeric'});
+  // ---- insights: each line states a number and says why it was picked
+  const L=[],p=Math.round;
+  if(r.cur.quota>0||r.cur.count>0){
+    const cmp=!r.hasPrev?t('iNoPrev'):Math.abs(r.cur.quota-r.prev.quota)<=r.prev.quota*.05?t('iFlat',{n}):r.cur.quota>r.prev.quota?t('iUp',{n,p:p((r.cur.quota/r.prev.quota-1)*100)}):t('iDown',{n,p:p((1-r.cur.quota/r.prev.quota)*100)});
+    L.push(['iSpend',{n,v:m(r.cur.quota),cmp}]);
+    if(r.runRate!=null&&r.runRate>0)L.push(['iRun',{v:m(r.runRate*30)}]);
+    if(r.anomalies.length){const a=r.anomalies.sort((x,y)=>y.v-x.v)[0];L.push(['iSpike',{d:dateL(a.t),x:a.ratio.toFixed(1)}])}else if(n>=7)L.push(['iNoSpike']);
+    if(r.users.length){const top=r.users[0],t3=r.users.slice(0,3).reduce((a,u)=>a+u.quota,0);if(pct(top.quota,r.cur.quota)>=30)L.push(['iTop',{n:top.name,p:pct(top.quota,r.cur.quota),p3:pct(t3,r.cur.quota)}])}
+    if(r.models.length>1&&pct(r.models[0].quota,r.cur.quota)>=50)L.push(['iTopModel',{n:r.models[0].name,p:pct(r.models[0].quota,r.cur.quota)}]);
+    if(r.movers){const{up,down}=r.movers;if(up&&up.d>r.prev.quota*.1)L.push(['iUp1',{n:up.name,v:m(up.d)}]);if(down&&-down.d>r.prev.quota*.1)L.push(['iDown1',{n:down.name,v:m(-down.d)}]);if(r.movers.fresh||r.movers.gone)L.push(['iNew',{a:r.movers.fresh,b:r.movers.gone}])}
+    if(r.quiet!=null){const hh=h=>String(h%24).padStart(2,'0')+':00';L.push(['iQuiet',{a:`${hh(r.quiet)}–${hh(r.quiet+4)}`,b:hh(r.peak)}])}
+    if(r.weekend!=null)L.push([r.weekend<1?'iWeekend':'iWeekendUp',{p:p(r.weekend*100)}]);
+  }
+  const delta=(a,b)=>!r.hasPrev||b===0?'':(a>=b?'+':'−')+Math.round(Math.abs(a-b)/b*100)+'%';
+  const fig=(k,v,dl)=>$('div',{className:'fig'},$('b',{},v),$('span',{},k+(dl?'  '+dl:'')));
+  const anom=new Set(r.anomalies.map(a=>a.t));
+  const dailyChart=bars(r.daily.map(d=>({x:dateL(d.t),v:d.v,cls:anom.has(d.t)?'hot':'',title:`${dateL(d.t)}: ${m(d.v)} · ${nf(d.count)} ${t('reqs')}`})),{fmt:v=>m(v),line:r.ma});
+  const hodChart=r.quiet==null?null:bars(r.hod.map((v,h)=>({x:String(h),v,cls:(h>=r.quiet&&h<r.quiet+4)||(r.quiet+4>24&&h<(r.quiet+4)%24)?'dim':'',title:`${String(h).padStart(2,'0')}:00 · ${nf(v)} ${t('reqs')}`})),{h:140,fmt:v=>nf(Math.round(v)),xl:i=>String(i),ints:true});
+  const table=(rows,label,total)=>tbl([label,t('spend'),t('share'),t('reqs'),t('change')].map((h,i)=>$('th',{className:i&&i!==2?'n':''},h)),
+    rows.slice(0,10).map(x=>$('tr',{},$('td',{},x.name),$('td',{className:'n'},m(x.quota)),
+      $('td',{},$('div',{className:'row mid',style:'margin:0'},$('div',{className:'hbar',style:'width:6rem'},$('i',{style:`width:${pct(x.quota,total)}%`})),$('span',{className:'mono'},pct(x.quota,total)+'%'))),
+      $('td',{className:'n'},nf(x.count)),
+      $('td',{className:'n '+(x.quota>=x.prev?'d-up':'d-dn')},!r.hasPrev?'':x.prev===0?t('newTag'):delta(x.quota,x.prev)))));
+  el.replaceChildren(sec(null,head,fail,
+    $('div',{className:'figs'},fig(t('spend'),m(r.cur.quota),delta(r.cur.quota,r.prev.quota)),fig(t('reqs'),nf(r.cur.count),delta(r.cur.count,r.prev.count)),fig(t('tokensL'),nf(r.cur.tokens),delta(r.cur.tokens,r.prev.tokens)),fig(t('activeU'),nf(r.cur.n),delta(r.cur.n,r.prev.n))),
+    L.length?$('div',{},$('h2',{style:'margin-bottom:var(--space-sm)'},t('insights')),$('ul',{className:'insights'},L.map(([k,v])=>$('li',{},rich(k,v))))):null,
+    $('h2',{},t('dailySpend')),$('div',{className:'swatches'},$('span',{},$('i'),t('dailySpend')),$('span',{},$('i',{className:'m'}),t('avg7')),anom.size?$('span',{className:'mute'},t('peakDay')+': '+[...anom].map(dateL).join(', ')):null,$('span',{className:'mute'},t('dayPartial'))),
+    dailyChart,
+    hodChart?$('div',{},$('h2',{style:'margin-top:var(--space-lg)'},t('hourOfDay')),$('div',{style:'height:var(--space-sm)'}),hodChart):null,
+    $('h2',{style:'margin-top:var(--space-lg);margin-bottom:var(--space-sm)'},t('byModel')),table(r.models,t('model'),r.cur.quota),
+    $('h2',{style:'margin-top:var(--space-lg);margin-bottom:var(--space-sm)'},t('byUser')),table(r.users,t('user'),r.cur.quota)));
 },
 async users(el){
   const q=$('input',{name:'keyword',placeholder:t('keywordPh')}),g=$('input',{name:'group'}),out=$('div'),msg=$('span',{className:'msg',role:'status'});
@@ -349,7 +519,7 @@ async quota(el){
 },
 async jobs(el){
   const list=await api('GET',P()+'/jobs');
-  const name=$('input',{name:'name'}),spec=$('input',{name:'spec',value:'0 3 * * *',placeholder:'0 3 * * *'}),kind=$('select',{},$('option',{value:'refresh'},t('kind.refresh')),$('option',{value:'quota'},t('kind.quota')));
+  const name=$('input',{name:'name'}),spec=$('input',{name:'spec',value:'0 3 * * *',placeholder:'0 3 * * *'}),kind=$('select',{},$('option',{value:'refresh'},t('kind.refresh')),$('option',{value:'usage'},t('kind.usage')),$('option',{value:'quota'},t('kind.quota')));
   const form=quotaForm({}),msg=$('div',{className:'msg',role:'status'}),lmsg=$('div',{className:'msg',role:'status'}),fw=$('div',{},form.el);
   const sync=()=>fw.style.display=kind.value==='quota'?'':'none';kind.addEventListener('change',sync);sync();
   const add=$('button',{className:'p',on:{click:async()=>{
@@ -359,18 +529,18 @@ async jobs(el){
     sec(t('jobs'),list.length?tbl([t('name'),t('kind'),t('spec'),t('content'),t('enabled'),''].map(h=>$('th',{},h)),list.map(j=>$('tr',{},
         $('td',{},j.name),$('td',{},t('kind.'+j.kind)),$('td',{className:'mono'},j.spec),
         $('td',{className:'mute'},j.plan?desc(j.plan):''),
-        $('td',{},$('input',{type:'checkbox','aria-label':t('enabled')+': '+j.name,checked:j.enabled,on:{change:async e=>{const c=e.target;try{await api('PUT',P()+'/jobs/'+j.id,{...j,enabled:c.checked});lmsg.textContent=''}catch(x){c.checked=!c.checked;flash(lmsg,x.message,1)}}}})),
-        $('td',{},$('button',{className:'d',on:{click:async()=>{if(confirm(t('delJob',{n:j.name}))){await api('DELETE',P()+'/jobs/'+j.id);render()}}}},t('del')))))):empty(t('noJobs')),lmsg),
-    sec(t('addJob'),$('div',{className:'well'},$('div',{className:'row'},fld(t('jobName'),name),fld(t('kind'),kind),fld(t('cron'),spec)),
+        $('td',{},$('input',{type:'checkbox',disabled:S.me.read_only,'aria-label':t('enabled')+': '+j.name,checked:j.enabled,on:{change:async e=>{const c=e.target;try{await api('PUT',P()+'/jobs/'+j.id,{...j,enabled:c.checked});lmsg.textContent=''}catch(x){c.checked=!c.checked;flash(lmsg,x.message,1)}}}})),
+        $('td',{},S.me.read_only?null:$('button',{className:'d',on:{click:async()=>{if(confirm(t('delJob',{n:j.name}))){await api('DELETE',P()+'/jobs/'+j.id);render()}}}},t('del')))))):empty(t('noJobs')),lmsg),
+    S.me.read_only?null:sec(t('addJob'),$('div',{className:'well'},$('div',{className:'row'},fld(t('jobName'),name),fld(t('kind'),kind),fld(t('cron'),spec)),
       $('p',{className:'hint'},t('cronHint')),fw,
       $('p',{className:'hint'},t('addWarn')),$('div',{className:'row mid'},add),msg)));
 },
 async runs(el){
-  const title=r=>r.title==='刷新统计'?t('kind.refresh'):r.title==='调整余额'?t('kind.quota'):r.title.startsWith('定时:')?t('sched')+r.title.slice(3):r.title;
+  const title=r=>r.title==='刷新统计'?t('kind.refresh'):r.title==='调整余额'?t('kind.quota'):r.title==='采集用量'?t('kind.usage'):r.title.startsWith('定时:')?t('sched')+r.title.slice(3):r.title;
   const draw=async()=>{
     const rs=await api('GET',P()+'/runs');
     el.replaceChildren(sec(t('runs'),rs.length?tbl([t('time'),t('kind'),t('content'),t('from'),t('status'),t('okTotal')].map(h=>$('th',{},h)),
-      rs.map(r=>$('tr',{},$('td',{},fmtT(r.started_at)),$('td',{},t(r.kind==='quota'?'kind.quotaS':'kind.refreshS')),$('td',{},title(r)),$('td',{},r.by==='cron'?t('cronBy'):r.by),
+      rs.map(r=>$('tr',{},$('td',{},fmtT(r.started_at)),$('td',{},t('kind.'+r.kind+'S')),$('td',{},title(r)),$('td',{},r.by==='cron'?t('cronBy'):r.by),
         $('td',{className:r.status==='ok'?'st-ok':r.status==='running'||r.status==='skipped'?'st-mute':'st-bad'},t('st.'+r.status)),
         $('td',{className:'mono'},r.kind==='quota'?`${r.ok}/${r.total}`:'',r.errors?$('pre',{},r.errors):null)))):empty(t('noRuns'))));
     return rs.some(r=>r.status==='running');
@@ -386,7 +556,7 @@ async audit(el){
     case 'job.delete':return d.name;
     case 'platform.create':case 'platform.update':return d.name+', '+d.base_url+(d.token_changed?' · '+t('tokenChanged'):'');
     case 'platform.delete':return d.name;
-    case 'admin.create':case 'admin.update':return d.username+(d.root?' (root)':'')+(d.password_changed?' · '+t('pwChanged'):'');
+    case 'admin.create':case 'admin.update':return d.username+(d.root?' (root)':d.read_only?' ('+t('roTag')+')':'')+(d.password_changed?' · '+t('pwChanged'):'');
     case 'admin.delete':return d.username;
     case 'token.create':case 'token.delete':return d.username;
     default:return ''}};
@@ -426,18 +596,18 @@ async platforms(el){
 async admins(el){
   const as=await api('GET','/api/admins');
   const row=a=>{
-    const pw=$('input',{'aria-label':t('pass'),type:'password',autocomplete:'new-password',placeholder:a?t('pwKeep'):t('pwNew')}),un=$('input',{'aria-label':t('user'),value:a?.username??'',disabled:!!a}),root=$('input',{type:'checkbox','aria-label':'root',checked:!!a?.root}),m=$('span',{className:'msg',role:'status'});
+    const pw=$('input',{'aria-label':t('pass'),type:'password',autocomplete:'new-password',placeholder:a?t('pwKeep'):t('pwNew')}),un=$('input',{'aria-label':t('user'),value:a?.username??'',disabled:!!a}),root=$('input',{type:'checkbox','aria-label':'root',checked:!!a?.root}),ro=$('input',{type:'checkbox','aria-label':t('roTag'),checked:!!a?.read_only}),m=$('span',{className:'msg',role:'status'});
     const checks=S.platforms.map(p=>[p,$('input',{type:'checkbox',checked:!!a?.platform_ids.includes(p.id)})]);
-    const save=async()=>{try{await api(a?'PUT':'POST','/api/admins'+(a?'/'+a.id:''),{username:un.value,password:pw.value,root:root.checked,platform_ids:checks.filter(([,c])=>c.checked).map(([p])=>p.id)});a?(pw.value?render():flash(m,t('saved'))):render()}catch(e){flash(m,e.message,1)}};
+    const save=async()=>{try{await api(a?'PUT':'POST','/api/admins'+(a?'/'+a.id:''),{username:un.value,password:pw.value,root:root.checked,read_only:ro.checked,platform_ids:checks.filter(([,c])=>c.checked).map(([p])=>p.id)});a?(pw.value?render():flash(m,t('saved'))):render()}catch(e){flash(m,e.message,1)}};
     // The token cell: for an existing admin it shows the token on demand; the new-admin row has none.
     const tk=$('td',{});
     if(a){const draw=async()=>{try{const{token}=await api('GET','/api/admins/'+a.id+'/token');tk.replaceChildren(await tokenWidget(a,m,draw)(token))}catch(e){flash(m,e.message,1)}};
       tk.append(a.has_token?$('button',{on:{click:draw}},t('tokShowB')):$('button',{on:{click:async()=>{try{await api('POST','/api/admins/'+a.id+'/token');await draw()}catch(e){flash(m,e.message,1)}}}},t('tokGen')))}
-    return $('tr',{},$('td',{},un),$('td',{},pw),$('td',{},root),$('td',{},checks.map(([p,c])=>$('label',{className:'chk'},c,p.name))),tk,
+    return $('tr',{},$('td',{},un),$('td',{},pw),$('td',{},root),$('td',{},ro),$('td',{},checks.map(([p,c])=>$('label',{className:'chk'},c,p.name))),tk,
       $('td',{},$('div',{className:'acts'},$('button',{className:a?'':'p',on:{click:save}},a?t('save'):t('create')),a?$('button',{className:'d',on:{click:async()=>{if(confirm(t('delAdmin',{n:a.username}))){try{await api('DELETE','/api/admins/'+a.id);render()}catch(e){flash(m,e.message,1)}}}}},t('del')):null,m)));
   };
-  el.replaceChildren(sec(t('admins'),$('p',{className:'hint'},t('adminHint')),
-    tbl([t('user'),t('pass'),'root',t('adminPlats'),t('tokCol'),''].map(h=>$('th',{},h)),[...as.map(row),row(null)])));
+  el.replaceChildren(sec(t('admins'),$('p',{className:'hint'},t('adminHint')),$('p',{className:'hint'},t('roHint')),
+    tbl([t('user'),t('pass'),'root',t('roTag'),t('adminPlats'),t('tokCol'),''].map(h=>$('th',{},h)),[...as.map(row),row(null)])));
 }};
 
 // tokenWidget builds the token cell for admin a: the token (hidden until shown), Copy, Regenerate and Delete.

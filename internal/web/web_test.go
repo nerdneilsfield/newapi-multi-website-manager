@@ -27,7 +27,7 @@ func newServer(t *testing.T) (*httptest.Server, *store.Store) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 	h, _ := bcrypt.GenerateFromPassword([]byte("right-password"), bcrypt.MinCost)
-	if _, err := st.CreateAdmin("root", string(h), true, nil); err != nil {
+	if _, err := st.CreateAdmin("root", string(h), true, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer(New(st, manager.New(t.Context(), st, zap.NewNop(), time.Millisecond)).Handler())
@@ -336,7 +336,7 @@ func TestMCPEndpoint(t *testing.T) {
 	for _, x := range list.Tools {
 		names[x.Name] = true
 	}
-	for _, want := range []string{"list_platforms", "get_stats", "refresh_stats", "list_users", "adjust_quota", "list_runs", "list_jobs", "create_job", "update_job", "delete_job", "list_audit"} {
+	for _, want := range []string{"list_platforms", "get_stats", "refresh_stats", "list_users", "adjust_quota", "list_runs", "list_jobs", "create_job", "update_job", "delete_job", "list_audit", "get_usage", "collect_usage"} {
 		if !names[want] {
 			t.Errorf("tool %s missing", want)
 		}
@@ -577,7 +577,7 @@ func TestSuccessfulLoginForgetsTheUsersFailures(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st.Close() })
 	h, _ := bcrypt.GenerateFromPassword([]byte("right-password"), bcrypt.MinCost)
-	if _, err := st.CreateAdmin("root", string(h), true, nil); err != nil {
+	if _, err := st.CreateAdmin("root", string(h), true, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	s := New(st, manager.New(t.Context(), st, zap.NewNop(), time.Millisecond))
@@ -604,4 +604,151 @@ func loginAs(t *testing.T, srv *httptest.Server, user, pass string) []*http.Cook
 	}
 	defer func() { _ = resp.Body.Close() }()
 	return resp.Cookies()
+}
+
+func TestReadOnlyAdminReadsWhatItIsGrantedAndChangesNothing(t *testing.T) {
+	srv, st := newServer(t)
+	rootC := loginJar(t, srv)
+	call(t, srv, rootC, "POST", "/api/platforms", `{"name":"p1","base_url":"https://a.example.com","token":"x"}`)
+	call(t, srv, rootC, "POST", "/api/platforms", `{"name":"p2","base_url":"https://b.example.com","token":"x"}`)
+	if c, b := call(t, srv, rootC, "POST", "/api/admins", `{"username":"eve","password":"eve-password","root":true,"read_only":true}`); c != 400 {
+		t.Errorf("a read-only root: %d %s", c, b)
+	}
+	if c, b := call(t, srv, rootC, "POST", "/api/admins", `{"username":"eve","password":"eve-password","read_only":true,"platform_ids":[1]}`); c != 200 {
+		t.Fatal(c, b)
+	}
+	if _, raw := call(t, srv, rootC, "GET", "/api/admins", ""); !strings.Contains(raw, `"read_only":true`) {
+		t.Errorf("list: %s", raw)
+	}
+	eve := loginAs(t, srv, "eve", "eve-password")
+
+	// Reads work, on the granted platform only.
+	if c, b := call(t, srv, eve, "GET", "/api/me", ""); c != 200 || !strings.Contains(b, `"read_only":true`) {
+		t.Errorf("me: %d %s", c, b)
+	}
+	if c, b := call(t, srv, eve, "GET", "/api/platforms/1/jobs", ""); c != 200 {
+		t.Errorf("read granted: %d %s", c, b)
+	}
+	if c, _ := call(t, srv, eve, "GET", "/api/platforms/2/jobs", ""); c != 403 {
+		t.Errorf("read ungranted: %d, want 403", c)
+	}
+
+	// Nothing changes, by session or by token.
+	tok := newToken(t, srv, eve, 2)
+	writes := [][3]string{
+		{"POST", "/api/platforms/1/refresh", `{}`},
+		{"POST", "/api/platforms/1/quota", `{"mode":"add","amount":1,"unit":"usd","group":"default"}`},
+		{"POST", "/api/platforms/1/jobs", `{"name":"n","kind":"refresh","spec":"@every 1h","enabled":true}`},
+		{"DELETE", "/api/platforms/1/jobs/1", ""},
+		{"POST", "/api/platforms", `{"name":"p3","base_url":"https://c.example.com","token":"x"}`},
+	}
+	for _, w := range writes {
+		if c, _ := call(t, srv, eve, w[0], w[1], w[2]); c != 403 {
+			t.Errorf("session %s %s: %d, want 403", w[0], w[1], c)
+		}
+		if c, _ := bearer(t, srv, tok, w[0], w[1], w[2]); c != 403 {
+			t.Errorf("token %s %s: %d, want 403", w[0], w[1], c)
+		}
+	}
+	if c, b := bearer(t, srv, tok, "GET", "/api/platforms", ""); c != 200 || strings.Contains(b, "p2") {
+		t.Errorf("token read: %d %s", c, b)
+	}
+	if isErr, b := toolText(t, srv, tok, "adjust_quota", `{"platform_id":1,"mode":"add","amount":1,"unit":"usd","group":"default"}`); !isErr || !strings.Contains(b, "只读") {
+		t.Errorf("adjust_quota over MCP: %v %s", isErr, b)
+	}
+	if isErr, b := toolText(t, srv, tok, "list_jobs", `{"platform_id":1}`); isErr {
+		t.Errorf("list_jobs over MCP: %s", b)
+	}
+	if runs, _ := st.Runs(1, 10); len(runs) != 0 {
+		t.Errorf("a refused write left runs behind: %v", runs)
+	}
+
+	// It still manages its own token, and changing the flag takes effect at once.
+	if c, _ := call(t, srv, eve, "DELETE", "/api/admins/2/token", ""); c != 200 {
+		t.Errorf("own token: %d", c)
+	}
+	call(t, srv, rootC, "PUT", "/api/admins/2", `{"username":"eve","platform_ids":[1]}`)
+	if c, _ := call(t, srv, loginAs(t, srv, "eve", "eve-password"), "POST", "/api/platforms/1/jobs", `{"name":"n","kind":"refresh","spec":"@every 1h","enabled":true}`); c != 200 {
+		t.Errorf("after the flag is cleared: %d, want 200", c)
+	}
+}
+
+func TestUsageEndpointFollowsGrantsAndReadOnly(t *testing.T) {
+	srv, st := newServer(t)
+	rootC := loginJar(t, srv)
+	call(t, srv, rootC, "POST", "/api/platforms", `{"name":"p1","base_url":"https://a.example.com","token":"x"}`)
+	call(t, srv, rootC, "POST", "/api/platforms", `{"name":"p2","base_url":"https://b.example.com","token":"x"}`)
+	call(t, srv, rootC, "POST", "/api/admins", `{"username":"eve","password":"eve-password","read_only":true,"platform_ids":[1]}`)
+
+	// h is 2026-01-01 23:00 UTC and h+3600 is 2026-01-02 00:00 UTC: two days in UTC, but in UTC+8
+	// (07:00 and 08:00 on Jan 2) one day. The day bucket depends on tz.
+	h := int64(1767308400)
+	if err := st.SaveUsage(1, store.UsageState{CollectedTo: h + 3600, QuotaPerUnit: 500000},
+		[]store.UsageHour{{T: h, Model: "gpt", Count: 2, Quota: 20, Tokens: 200}, {T: h + 3600, Model: "gpt", Count: 1, Quota: 5, Tokens: 50}},
+		[]store.UserHour{{T: h, Username: "a", Count: 2, Quota: 20, Tokens: 200}}); err != nil {
+		t.Fatal(err)
+	}
+	type resp struct {
+		State  *store.UsageState
+		Step   string
+		Models []store.UsageHour
+		Users  []store.UserHour
+	}
+	get := func(c []*http.Cookie, path string) (int, resp) {
+		code, b := call(t, srv, c, "GET", path, "")
+		var r resp
+		_ = json.Unmarshal([]byte(b), &r)
+		return code, r
+	}
+	q := "/api/platforms/1/usage?from=" + strconv.FormatInt(h-86400, 10) + "&to=" + strconv.FormatInt(h+86400, 10)
+
+	c, r := get(rootC, q)
+	if c != 200 || r.Step != "day" || r.State == nil || r.State.QuotaPerUnit != 500000 || len(r.Models) != 2 || r.Models[0].Quota != 20 || r.Models[1].Quota != 5 {
+		t.Fatalf("UTC days: %d %+v", c, r)
+	}
+	// In UTC+8 both hours fall on Jan 2, which starts at Jan 1 16:00 UTC.
+	if _, r = get(rootC, q+"&tz=480"); len(r.Models) != 1 || r.Models[0].Quota != 25 || r.Models[0].T != 1767283200 {
+		t.Fatalf("UTC+8 day: %+v", r)
+	}
+	// h-8h is Jan 1 15:00 UTC: Jan 1 in UTC, but 23:00 on Jan 1 in UTC+8, a different day from h.
+	if err := st.SaveUsage(1, store.UsageState{CollectedTo: h + 3600, QuotaPerUnit: 500000}, []store.UsageHour{{T: h - 8*3600, Model: "gpt", Count: 1, Quota: 7, Tokens: 70}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, r = get(rootC, q+"&tz=480"); len(r.Models) != 2 || r.Models[0].T != 1767283200-86400 || r.Models[0].Quota != 7 || r.Models[1].Quota != 25 {
+		t.Fatalf("UTC+8 split: %+v", r)
+	}
+	if _, r = get(rootC, q); len(r.Models) != 2 || r.Models[0].Quota != 27 || r.Models[1].Quota != 5 {
+		t.Fatalf("UTC days with the extra hour: %+v", r)
+	}
+	if _, r = get(rootC, q+"&step=hour"); len(r.Models) != 3 || r.Models[1].T != h {
+		t.Fatalf("hours: %+v", r)
+	}
+	if c, _ = get(rootC, "/api/platforms/1/usage?step=week"); c != 400 {
+		t.Errorf("bad step: %d", c)
+	}
+	if c, _ = get(rootC, "/api/platforms/1/usage?step=hour&from=0&to=99999999"); c != 400 {
+		t.Errorf("hourly span: %d", c)
+	}
+	if _, r = get(rootC, "/api/platforms/2/usage"); r.State != nil || len(r.Models) != 0 {
+		t.Errorf("an uncollected platform: %+v", r)
+	}
+
+	// Read-only eve may read platform 1, not platform 2, and may not start a collection.
+	eve := loginAs(t, srv, "eve", "eve-password")
+	if c, _ = get(eve, q); c != 200 {
+		t.Errorf("eve reads: %d", c)
+	}
+	if c, _ = get(eve, "/api/platforms/2/usage"); c != 403 {
+		t.Errorf("eve reads p2: %d", c)
+	}
+	if c, _ := call(t, srv, eve, "POST", "/api/platforms/1/usage/collect", ""); c != 403 {
+		t.Errorf("eve collects: %d", c)
+	}
+	tok := newToken(t, srv, eve, 2)
+	if isErr, b := toolText(t, srv, tok, "get_usage", `{"platform_id":1,"from":`+strconv.FormatInt(h-86400, 10)+`,"to":`+strconv.FormatInt(h+86400, 10)+`}`); isErr || !strings.Contains(b, `"quota":20`) {
+		t.Errorf("get_usage: %v %s", isErr, b)
+	}
+	if isErr, b := toolText(t, srv, tok, "collect_usage", `{"platform_id":1}`); !isErr || !strings.Contains(b, "只读") {
+		t.Errorf("collect_usage: %v %s", isErr, b)
+	}
 }
