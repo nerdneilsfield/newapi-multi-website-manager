@@ -3,7 +3,6 @@
 package newapi
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,8 +11,10 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
+	"golang.org/x/time/rate"
 )
 
 const pageSize = 100 // new-api caps page_size at 100
@@ -47,26 +48,52 @@ type Page struct {
 // Client talks to one platform. Calls are spaced by Interval so that bulk work
 // stays under new-api's default global limit (360 requests / 180 s / IP).
 type Client struct {
-	Interval time.Duration
-
 	base, token string
-	hc          *http.Client
-	mu          sync.Mutex
-	last        time.Time
+	hc          *retryablehttp.Client
 }
 
 // New returns a client for baseURL (no trailing slash needed).
 func New(baseURL, token string, interval time.Duration) *Client {
-	return &Client{
-		Interval: interval,
-		base:     strings.TrimRight(baseURL, "/"),
-		token:    token,
-		hc: &http.Client{
-			Timeout: 30 * time.Second,
-			// A redirect would resend the PAT to wherever it points (even http or another port).
-			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-		},
+	hc := retryablehttp.NewClient()
+	hc.Logger = nil
+	hc.RetryMax = 3
+	hc.RetryWaitMax = 300 * time.Second
+	// Only reads are retried, and only on 429: behind a proxy a 429 on a write may come after it took effect.
+	hc.CheckRetry = func(_ context.Context, resp *http.Response, _ error) (bool, error) {
+		return resp != nil && resp.StatusCode == http.StatusTooManyRequests && resp.Request.Method == http.MethodGet, nil
 	}
+	hc.Backoff = func(lo, hi time.Duration, attempt int, resp *http.Response) time.Duration {
+		if resp != nil && resp.Header.Get("Retry-After") != "" { // seconds or HTTP-date, parsed by the library
+			return min(retryablehttp.DefaultBackoff(lo, hi, attempt, resp), hi)
+		}
+		return 10 * time.Second
+	}
+	hc.ErrorHandler = retryablehttp.PassthroughErrorHandler // give up with the last response, so its status is reported
+	gap := rate.NewLimiter(rate.Inf, 1)
+	if interval > 0 {
+		gap = rate.NewLimiter(rate.Every(interval), 1)
+	}
+	hc.HTTPClient = &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: spaced{gap: gap, next: http.DefaultTransport},
+		// A redirect would resend the PAT to wherever it points (even http or another port).
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	return &Client{base: strings.TrimRight(baseURL, "/"), token: token, hc: hc}
+}
+
+// spaced makes every attempt, retries included, wait for the limiter. When the permit cannot be
+// had before the request's deadline, rate.Limiter.Wait fails at once and the request is not sent.
+type spaced struct {
+	gap  *rate.Limiter
+	next http.RoundTripper
+}
+
+func (t spaced) RoundTrip(r *http.Request) (*http.Response, error) {
+	if err := t.gap.Wait(r.Context()); err != nil {
+		return nil, err
+	}
+	return t.next.RoundTrip(r)
 }
 
 // Same reports whether c was built for this base URL and token.
@@ -141,32 +168,6 @@ func (c *Client) Adjust(ctx context.Context, id int64, mode string, value int64)
 	return c.do(ctx, http.MethodPost, "/api/user/manage", nil, body, nil)
 }
 
-func (c *Client) wait(ctx context.Context) error {
-	c.mu.Lock()
-	now := time.Now()
-	at := c.last.Add(c.Interval)
-	if at.Before(now) {
-		at = now
-	}
-	c.last = at
-	c.mu.Unlock()
-	return sleep(ctx, time.Until(at))
-}
-
-func sleep(ctx context.Context, d time.Duration) error {
-	if d <= 0 {
-		return ctx.Err()
-	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-		return nil
-	}
-}
-
 func (c *Client) do(ctx context.Context, method, path string, q url.Values, body, out any) error {
 	var payload []byte
 	if body != nil {
@@ -176,61 +177,45 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	if q != nil {
 		target += "?" + q.Encode()
 	}
-	for attempt := 0; ; attempt++ {
-		if err := c.wait(ctx); err != nil {
-			return err
-		}
-		req, err := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(payload))
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bearer "+c.token)
-		if body != nil {
-			req.Header.Set("Content-Type", "application/json")
-		}
-		resp, err := c.hc.Do(req)
-		if err != nil {
-			return err
-		}
-		data, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
-		_ = resp.Body.Close()
-		if err != nil {
-			return err
-		}
-		// Only reads are retried: behind a proxy a 429 on a write may come after it took effect.
-		if resp.StatusCode == http.StatusTooManyRequests && method == http.MethodGet && attempt < 3 {
-			wait, _ := strconv.Atoi(resp.Header.Get("Retry-After"))
-			if wait <= 0 || wait > 300 {
-				wait = 10
-			}
-			if err := sleep(ctx, time.Duration(wait)*time.Second); err != nil {
-				return err
-			}
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet(data))
-		}
-		var env struct {
-			Success bool            `json:"success"`
-			Message json.RawMessage `json:"message"`
-			Data    json.RawMessage `json:"data"`
-		}
-		if err := json.Unmarshal(data, &env); err != nil {
-			return fmt.Errorf("unexpected response (is the URL a new-api site?): %s", snippet(data))
-		}
-		if !env.Success {
-			var s string
-			if json.Unmarshal(env.Message, &s) != nil {
-				s = string(env.Message)
-			}
-			return fmt.Errorf("%s", s)
-		}
-		if out != nil {
-			return json.Unmarshal(env.Data, out)
-		}
-		return nil
+	req, err := retryablehttp.NewRequestWithContext(ctx, method, target, payload)
+	if err != nil {
+		return err
 	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return err
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	_ = resp.Body.Close()
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet(data))
+	}
+	var env struct {
+		Success bool            `json:"success"`
+		Message json.RawMessage `json:"message"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(data, &env); err != nil {
+		return fmt.Errorf("unexpected response (is the URL a new-api site?): %s", snippet(data))
+	}
+	if !env.Success {
+		var s string
+		if json.Unmarshal(env.Message, &s) != nil {
+			s = string(env.Message)
+		}
+		return fmt.Errorf("%s", s)
+	}
+	if out != nil {
+		return json.Unmarshal(env.Data, out)
+	}
+	return nil
 }
 
 func snippet(b []byte) string {

@@ -2,38 +2,21 @@
 package store
 
 import (
+	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"time"
 
+	"github.com/georgysavva/scany/v2/sqlscan"
+	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite" // registers the pure-Go "sqlite" driver
 )
 
-const schema = `
-CREATE TABLE IF NOT EXISTS admins(
-  id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, pass_hash TEXT NOT NULL, is_root INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS platforms(
-  id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, base_url TEXT NOT NULL, token TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS admin_platforms(
-  admin_id INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
-  platform_id INTEGER NOT NULL REFERENCES platforms(id) ON DELETE CASCADE,
-  PRIMARY KEY(admin_id, platform_id));
-CREATE TABLE IF NOT EXISTS snapshots(
-  platform_id INTEGER PRIMARY KEY REFERENCES platforms(id) ON DELETE CASCADE, data TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS jobs(
-  id INTEGER PRIMARY KEY, platform_id INTEGER NOT NULL REFERENCES platforms(id) ON DELETE CASCADE,
-  name TEXT NOT NULL, kind TEXT NOT NULL, spec TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, plan TEXT NOT NULL DEFAULT '');
-CREATE TABLE IF NOT EXISTS runs(
-  id INTEGER PRIMARY KEY, platform_id INTEGER NOT NULL REFERENCES platforms(id) ON DELETE CASCADE,
-  job_id INTEGER, kind TEXT NOT NULL, title TEXT NOT NULL, by TEXT NOT NULL, status TEXT NOT NULL,
-  total INTEGER NOT NULL DEFAULT 0, ok INTEGER NOT NULL DEFAULT 0, fail INTEGER NOT NULL DEFAULT 0,
-  errors TEXT NOT NULL DEFAULT '', started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS audit(
-  id INTEGER PRIMARY KEY, at INTEGER NOT NULL, admin_id INTEGER NOT NULL, admin TEXT NOT NULL,
-  platform_id INTEGER, platform TEXT NOT NULL DEFAULT '', action TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '{}');
-CREATE INDEX IF NOT EXISTS audit_admin ON audit(admin_id, id);
-`
+//go:embed migrations/*.sql
+var migrations embed.FS
 
 // Store wraps the SQLite database.
 type Store struct{ db *sql.DB }
@@ -54,11 +37,25 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schema); err != nil {
+	if err := migrate(db); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
 	return &Store{db}, nil
+}
+
+// migrate brings the schema up to date. To change the schema, add the next numbered file under migrations/.
+func migrate(db *sql.DB) error {
+	dir, err := fs.Sub(migrations, "migrations")
+	if err != nil {
+		return err
+	}
+	p, err := goose.NewProvider(goose.DialectSQLite3, db, dir)
+	if err != nil {
+		return err
+	}
+	_, err = p.Up(context.Background())
+	return err
 }
 
 // Close closes the database.
@@ -68,66 +65,46 @@ func (s *Store) Close() error { return s.db.Close() }
 
 // Admin is a manager login. Root admins manage admins and platforms and see every platform.
 type Admin struct {
-	ID          int64
-	Username    string
-	PassHash    string
-	IsRoot      bool
-	PlatformIDs []int64
+	ID          int64   `db:"id"`
+	Username    string  `db:"username"`
+	PassHash    string  `db:"pass_hash"`
+	IsRoot      bool    `db:"is_root"`
+	APIToken    string  `db:"api_token"` // "" when the admin has none
+	PlatformIDs []int64 `db:"-"`
 }
 
-func (s *Store) scanAdmin(row interface{ Scan(...any) error }) (Admin, error) {
-	var a Admin
-	if err := row.Scan(&a.ID, &a.Username, &a.PassHash, &a.IsRoot); err != nil {
-		return a, err
-	}
-	rows, err := s.db.Query(`SELECT platform_id FROM admin_platforms WHERE admin_id=? ORDER BY platform_id`, a.ID)
-	if err != nil {
-		return a, err
-	}
-	defer func() { _ = rows.Close() }()
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return a, err
-		}
-		a.PlatformIDs = append(a.PlatformIDs, id)
-	}
-	return a, rows.Err()
+const adminCols = `id,username,pass_hash,is_root,api_token`
+
+func (s *Store) grants(a *Admin) error {
+	return sqlscan.Select(context.Background(), s.db, &a.PlatformIDs, `SELECT platform_id FROM admin_platforms WHERE admin_id=? ORDER BY platform_id`, a.ID)
 }
 
 // AdminByName looks an admin up by username.
-func (s *Store) AdminByName(name string) (Admin, error) {
-	return s.scanAdmin(s.db.QueryRow(`SELECT id,username,pass_hash,is_root FROM admins WHERE username=?`, name))
+func (s *Store) AdminByName(name string) (a Admin, err error) {
+	if err = sqlscan.Get(context.Background(), s.db, &a, `SELECT `+adminCols+` FROM admins WHERE username=?`, name); err != nil {
+		return a, err
+	}
+	return a, s.grants(&a)
 }
 
 // Admin looks an admin up by id.
-func (s *Store) Admin(id int64) (Admin, error) {
-	return s.scanAdmin(s.db.QueryRow(`SELECT id,username,pass_hash,is_root FROM admins WHERE id=?`, id))
+func (s *Store) Admin(id int64) (a Admin, err error) {
+	if err = sqlscan.Get(context.Background(), s.db, &a, `SELECT `+adminCols+` FROM admins WHERE id=?`, id); err != nil {
+		return a, err
+	}
+	return a, s.grants(&a)
 }
 
 // Admins lists all admins.
 func (s *Store) Admins() ([]Admin, error) {
-	rows, err := s.db.Query(`SELECT id FROM admins ORDER BY id`)
-	if err != nil {
+	var out []Admin
+	if err := sqlscan.Select(context.Background(), s.db, &out, `SELECT `+adminCols+` FROM admins ORDER BY id`); err != nil {
 		return nil, err
 	}
-	var ids []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			_ = rows.Close()
+	for i := range out {
+		if err := s.grants(&out[i]); err != nil {
 			return nil, err
 		}
-		ids = append(ids, id)
-	}
-	_ = rows.Close()
-	var out []Admin
-	for _, id := range ids {
-		a, err := s.Admin(id)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, a)
 	}
 	return out, nil
 }
@@ -168,7 +145,7 @@ func (s *Store) CreateAdmin(username, hash string, root bool, platformIDs []int6
 	return id, tx.Commit()
 }
 
-// UpdateAdmin changes root flag, grants and (when hash != "") the password hash.
+// UpdateAdmin changes root flag, grants and (when hash != "") the password hash, which also revokes the admin's API token.
 func (s *Store) UpdateAdmin(id int64, hash string, root bool, platformIDs []int64) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -179,7 +156,8 @@ func (s *Store) UpdateAdmin(id int64, hash string, root bool, platformIDs []int6
 		return err
 	}
 	if hash != "" {
-		if _, err := tx.Exec(`UPDATE admins SET pass_hash=? WHERE id=?`, hash, id); err != nil {
+		// A new password is the answer to a leaked credential, so the API token goes with the sessions.
+		if _, err := tx.Exec(`UPDATE admins SET pass_hash=?, api_token='' WHERE id=?`, hash, id); err != nil {
 			return err
 		}
 	}
@@ -211,41 +189,27 @@ func (s *Store) DeleteAdmin(id int64) error {
 
 // Platform is one managed new-api instance.
 type Platform struct {
-	ID      int64
-	Name    string
-	BaseURL string
-	Token   string
+	ID      int64  `db:"id"`
+	Name    string `db:"name"`
+	BaseURL string `db:"base_url"`
+	Token   string `db:"token"`
 }
 
 // Platform returns one platform.
-func (s *Store) Platform(id int64) (Platform, error) {
-	var p Platform
-	err := s.db.QueryRow(`SELECT id,name,base_url,token FROM platforms WHERE id=?`, id).Scan(&p.ID, &p.Name, &p.BaseURL, &p.Token)
+func (s *Store) Platform(id int64) (p Platform, err error) {
+	err = sqlscan.Get(context.Background(), s.db, &p, `SELECT id,name,base_url,token FROM platforms WHERE id=?`, id)
 	return p, err
 }
 
 // Platforms lists the platforms an admin may see (all of them for root).
-func (s *Store) Platforms(a Admin) ([]Platform, error) {
-	q := `SELECT id,name,base_url,token FROM platforms ORDER BY name`
-	args := []any{}
+func (s *Store) Platforms(a Admin) (out []Platform, err error) {
+	q, args := `SELECT id,name,base_url,token FROM platforms ORDER BY name`, []any{}
 	if !a.IsRoot {
 		q = `SELECT p.id,p.name,p.base_url,p.token FROM platforms p JOIN admin_platforms g ON g.platform_id=p.id WHERE g.admin_id=? ORDER BY p.name`
 		args = append(args, a.ID)
 	}
-	rows, err := s.db.Query(q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-	var out []Platform
-	for rows.Next() {
-		var p Platform
-		if err := rows.Scan(&p.ID, &p.Name, &p.BaseURL, &p.Token); err != nil {
-			return nil, err
-		}
-		out = append(out, p)
-	}
-	return out, rows.Err()
+	err = sqlscan.Select(context.Background(), s.db, &out, q, args...)
+	return out, err
 }
 
 // CreatePlatform inserts a platform.
@@ -313,31 +277,33 @@ type QuotaPlan struct {
 
 // Job is a scheduled task: kind "refresh" updates statistics, "quota" applies Plan.
 type Job struct {
-	ID         int64      `json:"id"`
-	PlatformID int64      `json:"platform_id"`
-	Name       string     `json:"name"`
-	Kind       string     `json:"kind"`
-	Spec       string     `json:"spec"`
-	Enabled    bool       `json:"enabled"`
-	Plan       *QuotaPlan `json:"plan,omitempty"`
+	ID         int64      `json:"id" db:"id"`
+	PlatformID int64      `json:"platform_id" db:"platform_id"`
+	Name       string     `json:"name" db:"name"`
+	Kind       string     `json:"kind" db:"kind"`
+	Spec       string     `json:"spec" db:"spec"`
+	Enabled    bool       `json:"enabled" db:"enabled"`
+	Plan       *QuotaPlan `json:"plan,omitempty" db:"-"`
 }
 
-const jobCols = `id,platform_id,name,kind,spec,enabled,plan`
+// jobRow is a Job as stored: the plan is a JSON column.
+type jobRow struct {
+	Job
+	PlanJSON string `db:"plan"`
+}
 
-func scanJob(row interface{ Scan(...any) error }) (Job, error) {
-	var j Job
-	var plan string
-	if err := row.Scan(&j.ID, &j.PlatformID, &j.Name, &j.Kind, &j.Spec, &j.Enabled, &plan); err != nil {
-		return j, err
-	}
-	if plan != "" {
+func (r jobRow) job() (Job, error) {
+	j := r.Job
+	if r.PlanJSON != "" {
 		j.Plan = new(QuotaPlan)
-		if err := json.Unmarshal([]byte(plan), j.Plan); err != nil {
+		if err := json.Unmarshal([]byte(r.PlanJSON), j.Plan); err != nil {
 			return j, err
 		}
 	}
 	return j, nil
 }
+
+const jobCols = `id,platform_id,name,kind,spec,enabled,plan`
 
 func planJSON(p *QuotaPlan) string {
 	if p == nil {
@@ -349,24 +315,27 @@ func planJSON(p *QuotaPlan) string {
 
 // Job returns one job.
 func (s *Store) Job(id int64) (Job, error) {
-	return scanJob(s.db.QueryRow(`SELECT `+jobCols+` FROM jobs WHERE id=?`, id))
+	var r jobRow
+	if err := sqlscan.Get(context.Background(), s.db, &r, `SELECT `+jobCols+` FROM jobs WHERE id=?`, id); err != nil {
+		return Job{}, err
+	}
+	return r.job()
 }
 
 func (s *Store) jobs(where string, args ...any) ([]Job, error) {
-	rows, err := s.db.Query(`SELECT `+jobCols+` FROM jobs `+where+` ORDER BY id`, args...)
-	if err != nil {
+	var rs []jobRow
+	if err := sqlscan.Select(context.Background(), s.db, &rs, `SELECT `+jobCols+` FROM jobs `+where+` ORDER BY id`, args...); err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 	var out []Job
-	for rows.Next() {
-		j, err := scanJob(rows)
+	for _, r := range rs {
+		j, err := r.job()
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, j)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // Jobs lists a platform's jobs.
@@ -404,19 +373,19 @@ func (s *Store) DeleteJob(id int64) error {
 
 // Run is one execution of a refresh or quota operation.
 type Run struct {
-	ID         int64  `json:"id"`
-	PlatformID int64  `json:"platform_id"`
-	JobID      *int64 `json:"job_id"`
-	Kind       string `json:"kind"`
-	Title      string `json:"title"`
-	By         string `json:"by"`
-	Status     string `json:"status"` // running, ok, partial, failed, interrupted, skipped
-	Total      int    `json:"total"`
-	OK         int    `json:"ok"`
-	Fail       int    `json:"fail"`
-	Errors     string `json:"errors"`
-	StartedAt  int64  `json:"started_at"`
-	FinishedAt int64  `json:"finished_at"`
+	ID         int64  `json:"id" db:"id"`
+	PlatformID int64  `json:"platform_id" db:"platform_id"`
+	JobID      *int64 `json:"job_id" db:"job_id"`
+	Kind       string `json:"kind" db:"kind"`
+	Title      string `json:"title" db:"title"`
+	By         string `json:"by" db:"by"`
+	Status     string `json:"status" db:"status"` // running, ok, partial, failed, interrupted, skipped
+	Total      int    `json:"total" db:"total"`
+	OK         int    `json:"ok" db:"ok"`
+	Fail       int    `json:"fail" db:"fail"`
+	Errors     string `json:"errors" db:"errors"`
+	StartedAt  int64  `json:"started_at" db:"started_at"`
+	FinishedAt int64  `json:"finished_at" db:"finished_at"`
 }
 
 // CreateRun records a new running run.
@@ -442,39 +411,18 @@ func (s *Store) FinishRun(id int64, status string, total, ok, fail int, errs str
 	return err
 }
 
+const runCols = `id,platform_id,job_id,kind,title,by,status,total,ok,fail,errors,started_at,finished_at`
+
 // Run returns one run.
-func (s *Store) Run(id int64) (Run, error) {
-	var r Run
-	err := s.db.QueryRow(`SELECT id,platform_id,job_id,kind,title,by,status,total,ok,fail,errors,started_at,finished_at FROM runs WHERE id=?`, id).
-		Scan(&r.ID, &r.PlatformID, &r.JobID, &r.Kind, &r.Title, &r.By, &r.Status, &r.Total, &r.OK, &r.Fail, &r.Errors, &r.StartedAt, &r.FinishedAt)
+func (s *Store) Run(id int64) (r Run, err error) {
+	err = sqlscan.Get(context.Background(), s.db, &r, `SELECT `+runCols+` FROM runs WHERE id=?`, id)
 	return r, err
 }
 
 // Runs lists a platform's most recent runs.
-func (s *Store) Runs(platformID int64, limit int) ([]Run, error) {
-	rows, err := s.db.Query(`SELECT id FROM runs WHERE platform_id=? ORDER BY id DESC LIMIT ?`, platformID, limit)
-	if err != nil {
-		return nil, err
-	}
-	var ids []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			_ = rows.Close()
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	_ = rows.Close()
-	var out []Run
-	for _, id := range ids {
-		r, err := s.Run(id)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, r)
-	}
-	return out, nil
+func (s *Store) Runs(platformID int64, limit int) (out []Run, err error) {
+	err = sqlscan.Select(context.Background(), s.db, &out, `SELECT `+runCols+` FROM runs WHERE platform_id=? ORDER BY id DESC LIMIT ?`, platformID, limit)
+	return out, err
 }
 
 // InterruptRunning marks runs left "running" by a previous process as interrupted.
@@ -488,14 +436,20 @@ func (s *Store) InterruptRunning() error {
 // Audit is one operator action. It keeps the admin and platform names as text with no foreign
 // keys, so the entry survives deleting either of them.
 type Audit struct {
-	ID         int64           `json:"id"`
-	At         int64           `json:"at"`
-	AdminID    int64           `json:"admin_id"`
-	Admin      string          `json:"admin"`
-	PlatformID *int64          `json:"platform_id"`
-	Platform   string          `json:"platform"`
-	Action     string          `json:"action"`
-	Detail     json.RawMessage `json:"detail"`
+	ID         int64           `json:"id" db:"id"`
+	At         int64           `json:"at" db:"at"`
+	AdminID    int64           `json:"admin_id" db:"admin_id"`
+	Admin      string          `json:"admin" db:"admin"`
+	PlatformID *int64          `json:"platform_id" db:"platform_id"`
+	Platform   string          `json:"platform" db:"platform"`
+	Action     string          `json:"action" db:"action"`
+	Detail     json.RawMessage `json:"detail" db:"-"`
+}
+
+// auditRow is an Audit as stored: the detail is a JSON text column.
+type auditRow struct {
+	Audit
+	DetailJSON string `db:"detail"`
 }
 
 // AddAudit records an action. platformID 0 means the action is not tied to a platform.
@@ -521,20 +475,41 @@ func (s *Store) Audits(a Admin, before int64, limit int) ([]Audit, error) {
 		q += ` AND admin_id=?`
 		args = append(args, a.ID)
 	}
-	rows, err := s.db.Query(q+` ORDER BY id DESC LIMIT ?`, append(args, limit)...)
-	if err != nil {
+	var rs []auditRow
+	if err := sqlscan.Select(context.Background(), s.db, &rs, q+` ORDER BY id DESC LIMIT ?`, append(args, limit)...); err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-	out := []Audit{}
-	for rows.Next() {
-		var e Audit
-		var d string
-		if err := rows.Scan(&e.ID, &e.At, &e.AdminID, &e.Admin, &e.PlatformID, &e.Platform, &e.Action, &d); err != nil {
-			return nil, err
-		}
-		e.Detail = json.RawMessage(d)
-		out = append(out, e)
+	out := make([]Audit, len(rs))
+	for i, r := range rs {
+		out[i] = r.Audit
+		out[i].Detail = json.RawMessage(r.DetailJSON)
 	}
-	return out, rows.Err()
+	return out, nil
+}
+
+// ---- API token ----
+
+// SetAPIToken sets the admin's API token, replacing any earlier one; "" removes it.
+// It returns sql.ErrNoRows when there is no such admin.
+func (s *Store) SetAPIToken(adminID int64, token string) error {
+	res, err := s.db.Exec(`UPDATE admins SET api_token=? WHERE id=?`, token, adminID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// AdminByToken returns the admin that owns this API token.
+func (s *Store) AdminByToken(token string) (Admin, error) {
+	if token == "" {
+		return Admin{}, sql.ErrNoRows
+	}
+	var id int64
+	if err := s.db.QueryRow(`SELECT id FROM admins WHERE api_token=?`, token).Scan(&id); err != nil {
+		return Admin{}, err
+	}
+	return s.Admin(id)
 }

@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jellydator/ttlcache/v3"
+	"github.com/unrolled/secure"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/nerdneilsfield/newapi-multi-website-manager/internal/manager"
@@ -37,28 +39,23 @@ type Server struct {
 	Store *store.Store
 	Mgr   *manager.Manager
 
-	mu       sync.Mutex
-	sessions map[string]session // in memory: a restart logs everyone out
-	fails    map[string]loginFails
-}
-
-type loginFails struct {
-	n     int
-	until time.Time
+	mu       sync.Mutex                     // makes read-then-write on fails atomic
+	sessions *ttlcache.Cache[string, int64] // token -> admin id; in memory, so a restart logs everyone out
+	fails    *ttlcache.Cache[string, int]   // "ip:..." and "user:..." -> failed logins, kept for loginLockout
+	csrf     *http.CrossOriginProtection
 }
 
 const maxLoginFails = 5 // per client IP and per username, then locked for loginLockout
 
 var loginLockout = time.Minute
 
-type session struct {
-	adminID int64
-	expires time.Time
-}
-
 // New builds a Server.
 func New(s *store.Store, m *manager.Manager) *Server {
-	return &Server{Store: s, Mgr: m, sessions: map[string]session{}, fails: map[string]loginFails{}}
+	return &Server{
+		Store: s, Mgr: m, csrf: http.NewCrossOriginProtection(),
+		sessions: ttlcache.New(ttlcache.WithTTL[string, int64](sessionTTL), ttlcache.WithDisableTouchOnHit[string, int64]()),
+		fails:    ttlcache.New(ttlcache.WithDisableTouchOnHit[string, int]()),
+	}
 }
 
 type handler func(w http.ResponseWriter, r *http.Request, me store.Admin)
@@ -73,7 +70,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/login", s.login)
 	mux.HandleFunc("POST /api/logout", s.logout)
 	mux.HandleFunc("GET /api/me", s.auth(false, func(w http.ResponseWriter, _ *http.Request, me store.Admin) {
-		writeJSON(w, map[string]any{"id": me.ID, "username": me.Username, "root": me.IsRoot})
+		writeJSON(w, map[string]any{"id": me.ID, "username": me.Username, "root": me.IsRoot, "has_token": me.APIToken != ""})
 	}))
 
 	mux.HandleFunc("GET /api/platforms", s.auth(false, s.listPlatforms))
@@ -93,22 +90,19 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /api/audit", s.auth(false, s.listAudit))
 
+	mux.HandleFunc("GET /api/admins/{id}/token", s.sessionAuth(false, s.tokenOf(s.getToken)))
+	mux.HandleFunc("POST /api/admins/{id}/token", s.sessionAuth(false, s.tokenOf(s.newToken)))
+	mux.HandleFunc("DELETE /api/admins/{id}/token", s.sessionAuth(false, s.tokenOf(s.deleteToken)))
+	mux.Handle("/mcp", s.mcpHandler(mux))
+
 	mux.HandleFunc("GET /api/admins", s.auth(true, s.listAdmins))
-	mux.HandleFunc("POST /api/admins", s.auth(true, s.saveAdmin))
-	mux.HandleFunc("PUT /api/admins/{id}", s.auth(true, s.saveAdmin))
-	mux.HandleFunc("DELETE /api/admins/{id}", s.auth(true, s.deleteAdmin))
-	return secure(mux)
+	mux.HandleFunc("POST /api/admins", s.sessionAuth(true, s.saveAdmin))
+	mux.HandleFunc("PUT /api/admins/{id}", s.sessionAuth(true, s.saveAdmin))
+	mux.HandleFunc("DELETE /api/admins/{id}", s.sessionAuth(true, s.deleteAdmin))
+	return secureHeaders.Handler(mux)
 }
 
-func secure(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h := w.Header()
-		h.Set("X-Frame-Options", "DENY")
-		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("Referrer-Policy", "no-referrer")
-		next.ServeHTTP(w, r)
-	})
-}
+var secureHeaders = secure.New(secure.Options{FrameDeny: true, ContentTypeNosniff: true, ReferrerPolicy: "no-referrer"})
 
 // ---- helpers ----
 
@@ -136,18 +130,16 @@ func pathID(r *http.Request, name string) int64 {
 	return id
 }
 
-// sameOriginJSON lets a state-changing request through only if it is JSON and same-origin,
-// which blocks cross-site form posts.
-func sameOriginJSON(w http.ResponseWriter, r *http.Request) bool {
+// sameOriginJSON lets a state-changing request through only if it is JSON and not cross-origin,
+// which blocks cross-site form posts. The origin check is the standard library's.
+func (s *Server) sameOriginJSON(w http.ResponseWriter, r *http.Request) bool {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") && r.ContentLength != 0 {
 		fail(w, http.StatusUnsupportedMediaType, "需要 application/json")
 		return false
 	}
-	if o := r.Header.Get("Origin"); o != "" {
-		if u, err := url.Parse(o); err != nil || u.Host != r.Host {
-			fail(w, http.StatusForbidden, "跨站请求被拒绝")
-			return false
-		}
+	if err := s.csrf.Check(r); err != nil {
+		fail(w, http.StatusForbidden, "跨站请求被拒绝")
+		return false
 	}
 	return true
 }
@@ -177,31 +169,44 @@ func (s *Server) listAudit(w http.ResponseWriter, r *http.Request, me store.Admi
 	writeJSON(w, es)
 }
 
-// auth requires a valid session; root additionally requires a root admin.
+// authenticate identifies the caller: by the Authorization header when there is one, otherwise
+// by the session cookie. A bad token never falls back to the cookie. It writes the error itself.
+func (s *Server) authenticate(w http.ResponseWriter, r *http.Request) (store.Admin, bool) {
+	if h := r.Header.Get("Authorization"); h != "" {
+		// A token is not an ambient credential, so the cross-site checks below do not apply to it.
+		me, ok := s.byToken(h)
+		if !ok {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			fail(w, http.StatusUnauthorized, "令牌无效")
+		}
+		return me, ok
+	}
+	if r.Method != http.MethodGet && !s.sameOriginJSON(w, r) {
+		return store.Admin{}, false
+	}
+	c, err := r.Cookie(cookieName)
+	if err != nil {
+		fail(w, http.StatusUnauthorized, "未登录")
+		return store.Admin{}, false
+	}
+	sess := s.sessions.Get(c.Value)
+	if sess == nil {
+		fail(w, http.StatusUnauthorized, "未登录")
+		return store.Admin{}, false
+	}
+	me, err := s.Store.Admin(sess.Value()) // re-read so revoked grants apply immediately
+	if err != nil {
+		fail(w, http.StatusUnauthorized, "未登录")
+		return store.Admin{}, false
+	}
+	return me, true
+}
+
+// auth requires a valid session or token; root additionally requires a root admin.
 func (s *Server) auth(root bool, h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && !sameOriginJSON(w, r) {
-			return
-		}
-		c, err := r.Cookie(cookieName)
-		if err != nil {
-			fail(w, http.StatusUnauthorized, "未登录")
-			return
-		}
-		s.mu.Lock()
-		sess, ok := s.sessions[c.Value]
-		if ok && time.Now().After(sess.expires) {
-			delete(s.sessions, c.Value)
-			ok = false
-		}
-		s.mu.Unlock()
+		me, ok := s.authenticate(w, r)
 		if !ok {
-			fail(w, http.StatusUnauthorized, "未登录")
-			return
-		}
-		me, err := s.Store.Admin(sess.adminID) // re-read so revoked grants apply immediately
-		if err != nil {
-			fail(w, http.StatusUnauthorized, "未登录")
 			return
 		}
 		if root && !me.IsRoot {
@@ -228,16 +233,8 @@ func (s *Server) platform(h handler) http.HandlerFunc {
 // lockedOut reports whether any key has hit the failure limit. Keys are the client IP and the
 // username, so one IP cannot guess many passwords and many IPs cannot hammer one account.
 func (s *Server) lockedOut(keys ...string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now()
-	for k, f := range s.fails {
-		if now.After(f.until) {
-			delete(s.fails, k)
-		}
-	}
 	for _, k := range keys {
-		if f := s.fails[k]; f.n >= maxLoginFails {
+		if f := s.fails.Get(k); f != nil && f.Value() >= maxLoginFails {
 			return true
 		}
 	}
@@ -248,15 +245,16 @@ func (s *Server) recordFail(keys ...string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, k := range keys {
-		f := s.fails[k]
-		f.n++
-		f.until = time.Now().Add(loginLockout)
-		s.fails[k] = f
+		n := 0
+		if f := s.fails.Get(k); f != nil {
+			n = f.Value()
+		}
+		s.fails.Set(k, n+1, loginLockout)
 	}
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	if !sameOriginJSON(w, r) {
+	if !s.sameOriginJSON(w, r) {
 		return
 	}
 	var in struct {
@@ -284,15 +282,10 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tok := hex.EncodeToString(b)
-	s.mu.Lock()
-	delete(s.fails, "user:"+in.Username)
-	for k, v := range s.sessions {
-		if time.Now().After(v.expires) {
-			delete(s.sessions, k)
-		}
-	}
-	s.sessions[tok] = session{a.ID, time.Now().Add(sessionTTL)}
-	s.mu.Unlock()
+	s.fails.Delete("user:" + in.Username)
+	s.sessions.DeleteExpired()
+	s.fails.DeleteExpired()
+	s.sessions.Set(tok, a.ID, ttlcache.DefaultTTL)
 	http.SetCookie(w, &http.Cookie{
 		Name: cookieName, Value: tok, Path: "/", HttpOnly: true,
 		SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil, MaxAge: int(sessionTTL.Seconds()),
@@ -302,13 +295,11 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
-	if !sameOriginJSON(w, r) {
+	if !s.sameOriginJSON(w, r) {
 		return
 	}
 	if c, err := r.Cookie(cookieName); err == nil {
-		s.mu.Lock()
-		delete(s.sessions, c.Value)
-		s.mu.Unlock()
+		s.sessions.Delete(c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{Name: cookieName, Path: "/", MaxAge: -1})
 	writeJSON(w, map[string]bool{"ok": true})
@@ -565,6 +556,7 @@ type adminView struct {
 	Username    string  `json:"username"`
 	Root        bool    `json:"root"`
 	PlatformIDs []int64 `json:"platform_ids"`
+	HasToken    bool    `json:"has_token"`
 }
 
 func (s *Server) listAdmins(w http.ResponseWriter, _ *http.Request, _ store.Admin) {
@@ -578,7 +570,7 @@ func (s *Server) listAdmins(w http.ResponseWriter, _ *http.Request, _ store.Admi
 		if a.PlatformIDs == nil {
 			a.PlatformIDs = []int64{}
 		}
-		out = append(out, adminView{a.ID, a.Username, a.IsRoot, a.PlatformIDs})
+		out = append(out, adminView{a.ID, a.Username, a.IsRoot, a.PlatformIDs, a.APIToken != ""})
 	}
 	writeJSON(w, out)
 }
@@ -651,11 +643,9 @@ func (s *Server) deleteAdmin(w http.ResponseWriter, r *http.Request, me store.Ad
 
 // dropSessions logs an admin out everywhere after a password or privilege change.
 func (s *Server) dropSessions(adminID int64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for k, v := range s.sessions {
-		if v.adminID == adminID {
-			delete(s.sessions, k)
+	for _, it := range s.sessions.Items() {
+		if it.Value() == adminID {
+			s.sessions.Delete(it.Key())
 		}
 	}
 }

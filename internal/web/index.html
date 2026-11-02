@@ -132,7 +132,7 @@ pre { margin: var(--space-2xs) 0 0; white-space: pre-wrap; font-family: var(--fo
 const D={
 zh:{
 app:'new-api 多平台管理',user:'用户名',pass:'密码',login:'登录',logout:'退出',langTo:'English',platform:'平台',loading:'加载中…',retry:'重试',
-'tab.stats':'统计','tab.users':'用户','tab.quota':'调整余额','tab.jobs':'定时任务','tab.runs':'执行记录','tab.audit':'操作记录','tab.platforms':'平台管理','tab.admins':'管理员',
+'tab.stats':'统计','tab.users':'用户','tab.quota':'调整余额','tab.jobs':'定时任务','tab.runs':'执行记录','tab.audit':'操作记录','tab.tokens':'令牌','tab.platforms':'平台管理','tab.admins':'管理员',
 noPlatRoot:'还没有平台，请到「平台管理」添加。',noPlatUser:'你还没有被授权任何平台，请联系 root 管理员。',addPlat:'添加平台',
 refresh:'刷新统计',refreshing:'刷新中…',updatedAt:'更新于 {t}',noData:'尚无数据',lastFail:'上次刷新: {s}\n{e}',
 users:'用户数',totalBal:'总余额',totalUsed:'总用量',requests:'请求数',group:'分组',balance:'余额',used:'用量',
@@ -157,15 +157,18 @@ audit:'操作记录',auditRoot:'所有管理员的操作，新的在前。',audi
 'a.login':'登录','a.refresh':'刷新统计','a.quota':'调整余额','a.job.create':'新增任务','a.job.update':'修改任务','a.job.delete':'删除任务',
 'a.platform.create':'添加平台','a.platform.update':'修改平台','a.platform.delete':'删除平台','a.admin.create':'新增管理员','a.admin.update':'修改管理员','a.admin.delete':'删除管理员',
 tokenChanged:'更换了令牌',pwChanged:'修改了密码',
+'a.token.create':'生成令牌','a.token.delete':'删除令牌',
+tokens:'API 令牌',tokensHint:'每个管理员只有一个令牌。MCP 客户端凭它以你的身份管理平台，权限与你相同，之后调整平台授权会立即生效。你可以自己生成，root 也能替你生成，root 看得到它。重新生成后旧令牌立刻失效；改密码也会使令牌失效。令牌不能生成或删除令牌，也不能新增、修改、删除管理员账号。',
+tokGen:'生成令牌',tokRegen:'重新生成',tokNone:'还没有令牌',tokCopy:'复制',tokCopied:'已复制',tokShowB:'显示',tokHide:'隐藏',tokDel:'删除 {n} 的令牌？使用它的客户端会立刻失去访问。',tokRegenQ:'重新生成 {n} 的令牌？旧令牌会立刻失效。',tokUrl:'MCP 地址',tokCfg:'客户端配置示例',tokHeader:'请求头',
 platforms:'平台',tokenKeep:'留空保持不变',save:'保存',saved:'已保存',delPlat:'删除平台 {n} 及其任务和记录？',noPlats:'暂无平台',addPlatH:'新增平台',
 patHint:'Token 用目标站「安全设置 → Access Tokens」创建的 PAT，需要权限 user:read、user:write、group:read。目标站版本需 ≥ v1.0.0-rc.41。',
 add:'添加',
-admins:'管理员',adminHint:'非 root 管理员只能看到并操作被勾选的平台；root 可管理全部平台与管理员。改密码或权限会使该管理员的登录失效。',
+admins:'管理员',adminHint:'非 root 管理员只能看到并操作被勾选的平台；root 可管理全部平台与管理员。改密码或权限会使该管理员的登录失效，改密码还会使他的令牌失效。',tokCol:'令牌',
 adminPlats:'可管理的平台',pwKeep:'留空不改',pwNew:'密码(≥8位)',create:'新增',delAdmin:'删除 {n}？'
 },
 en:{
 app:'new-api multi-site manager',user:'Username',pass:'Password',login:'Sign in',logout:'Sign out',langTo:'中文',platform:'Platform',loading:'Loading…',retry:'Retry',
-'tab.stats':'Stats','tab.users':'Users','tab.quota':'Adjust balance','tab.jobs':'Schedules','tab.runs':'Runs','tab.audit':'Audit log','tab.platforms':'Platforms','tab.admins':'Admins',
+'tab.stats':'Stats','tab.users':'Users','tab.quota':'Adjust balance','tab.jobs':'Schedules','tab.runs':'Runs','tab.audit':'Audit log','tab.tokens':'Tokens','tab.platforms':'Platforms','tab.admins':'Admins',
 noPlatRoot:'No platforms yet. Add one under Platforms.',noPlatUser:'You have not been granted any platform. Ask a root admin.',addPlat:'Add a platform',
 refresh:'Refresh stats',refreshing:'Refreshing…',updatedAt:'Updated {t}',noData:'No data yet',lastFail:'Last refresh: {s}\n{e}',
 users:'Users',totalBal:'Total balance',totalUsed:'Total usage',requests:'Requests',group:'Group',balance:'Balance',used:'Usage',
@@ -190,17 +193,20 @@ audit:'Audit log',auditRoot:'Actions of all admins, newest first.',auditOwn:'You
 'a.login':'Signed in','a.refresh':'Refresh stats','a.quota':'Adjust balance','a.job.create':'Added job','a.job.update':'Changed job','a.job.delete':'Deleted job',
 'a.platform.create':'Added platform','a.platform.update':'Changed platform','a.platform.delete':'Deleted platform','a.admin.create':'Added admin','a.admin.update':'Changed admin','a.admin.delete':'Deleted admin',
 tokenChanged:'token replaced',pwChanged:'password changed',
+'a.token.create':'Generated token','a.token.delete':'Deleted token',
+tokens:'API token',tokensHint:'Each admin has one token. An MCP client uses it to manage platforms as you, with exactly your permissions; later changes to your platform grants apply at once. You can generate it yourself, or root can generate it for you, and root can see it. Generating a new one revokes the old one at once, and so does changing your password. A token cannot generate or delete tokens, nor add, change or delete admin accounts.',
+tokGen:'Generate token',tokRegen:'Regenerate',tokNone:'No token yet',tokCopy:'Copy',tokCopied:'Copied',tokShowB:'Show',tokHide:'Hide',tokDel:'Delete the token of {n}? Any client using it loses access at once.',tokRegenQ:'Regenerate the token of {n}? The old one stops working at once.',tokUrl:'MCP URL',tokCfg:'Example client config',tokHeader:'Header',
 platforms:'Platforms',tokenKeep:'Leave empty to keep',save:'Save',saved:'Saved',delPlat:'Delete platform {n} with its jobs and runs?',noPlats:'No platforms yet',addPlatH:'Add platform',
 patHint:'Use a PAT created on the target site under Security Settings → Access Tokens, with scopes user:read, user:write and group:read. The site must be v1.0.0-rc.41 or later.',
 add:'Add',
-admins:'Admins',adminHint:'A non-root admin sees and operates only the ticked platforms. Root manages all platforms and admins. Changing a password or permissions signs that admin out.',
+admins:'Admins',adminHint:'A non-root admin sees and operates only the ticked platforms. Root manages all platforms and admins. Changing a password or permissions signs that admin out, and a password change also revokes their token.',tokCol:'Token',
 adminPlats:'Platforms they can manage',pwKeep:'Leave empty to keep',pwNew:'Password (8+ chars)',create:'Add',delAdmin:'Delete {n}?'
 }};
 // Messages the server sends in Chinese, keyed by the exact text or by prefix.
 const SRV={
 '密码至少 8 位':'Password must be at least 8 characters','需要 application/json':'Content-Type must be application/json',
 '需要名称和以 http(s):// 开头的 URL(不能带用户名密码)':'A name and a URL starting with http(s):// are required (no username or password in the URL)',
-'需要 plan':'A plan is required','需要 root 管理员':'Root admin required','不能取消自己的 root 权限':'You cannot remove your own root permission',
+'需要 plan':'A plan is required','需要 root 管理员':'Root admin required','令牌无效':'Invalid token','令牌不能管理令牌和管理员账号，请登录网页后操作':'A token cannot manage tokens or admin accounts; sign in to the web page','只能管理自己的令牌':'You can manage only your own token','管理员不存在':'Admin not found','无法生成令牌':'Could not generate a token','不能取消自己的 root 权限':'You cannot remove your own root permission',
 '新平台需要 token':'A new platform needs a token','未登录':'Not signed in','平台不存在':'Platform not found','请求格式错误':'Malformed request',
 '跨站请求被拒绝':'Cross-site request rejected','用户名或密码错误':'Wrong username or password','尝试次数过多，请稍后再试':'Too many attempts, try again later',
 '密码过长(bcrypt 上限 72 字节)':'Password too long (bcrypt limit is 72 bytes)','kind 必须是 refresh 或 quota':'kind must be refresh or quota',
@@ -237,7 +243,7 @@ const skeleton=()=>$('div',{className:'sk',role:'status','aria-busy':'true'},$('
 const empty=(msg,btn)=>$('div',{className:'empty'},$('p',{},msg),btn);
 const failBox=(e,retry)=>$('div',{className:'fail',role:'alert'},e.message,retry?$('button',{on:{click:retry}},t('retry')):null);
 
-const TABS=['stats','users','quota','jobs','runs','audit','platforms','admins'];
+const TABS=['stats','users','quota','jobs','runs','audit','tokens','platforms','admins'];
 function readHash(){
   const q=new URLSearchParams(location.hash.slice(1));
   if(TABS.includes(q.get('tab')))S.tab=q.get('tab');
@@ -279,7 +285,7 @@ function render(){
       $('button',{on:{click:()=>setLang(S.lang==='zh'?'en':'zh')}},t('langTo')),
       $('button',{on:{click:async()=>{await api('POST','/api/logout',{});boot()}}},t('logout')))),
     nav,body);
-  const needsP=!['audit','platforms','admins'].includes(S.tab);
+  const needsP=!['audit','tokens','platforms','admins'].includes(S.tab);
   if(needsP&&S.cur==null)return body.append(S.me.root?empty(t('noPlatRoot'),$('button',{className:'p',on:{click:()=>go({tab:'platforms'})}},t('addPlat'))):empty(t('noPlatUser')));
   body.append(skeleton());
   const run=()=>views[S.tab](body).catch(e=>body.replaceChildren(failBox(e,()=>{body.replaceChildren(skeleton());run()})));
@@ -382,12 +388,27 @@ async audit(el){
     case 'platform.delete':return d.name;
     case 'admin.create':case 'admin.update':return d.username+(d.root?' (root)':'')+(d.password_changed?' · '+t('pwChanged'):'');
     case 'admin.delete':return d.username;
+    case 'token.create':case 'token.delete':return d.username;
     default:return ''}};
   const draw=more=>el.replaceChildren(sec(t('audit'),$('p',{className:'hint'},t(S.me.root?'auditRoot':'auditOwn')),
     es.length?tbl([t('time'),t('actor'),t('platform'),t('action'),t('detail')].map(h=>$('th',{},h)),
       es.map(e=>$('tr',{},$('td',{},fmtT(e.at)),$('td',{},e.admin),$('td',{},e.platform||'-'),$('td',{},t('a.'+e.action)),$('td',{className:'mute'},sum(e))))):empty(t('noAudit')),
     more?$('div',{className:'row mid',style:'margin-top:var(--space-sm)'},$('button',{on:{click:async()=>{try{const older=await api('GET','/api/audit?before='+es[es.length-1].id);es=es.concat(older);draw(older.length>=200)}catch(e){el.append(failBox(e))}}}},t('more'))):null));
   draw(es.length>=200);
+},
+async tokens(el){
+  const mcp=location.origin+'/mcp';
+  const cfg=tok=>JSON.stringify({mcpServers:{napm:{type:'http',url:mcp,headers:{Authorization:'Bearer '+tok}}}},null,2);
+  const card=$('div'),m=$('span',{className:'msg',role:'status'});
+  const draw=async()=>{
+    const {token}=await api('GET','/api/admins/'+S.me.id+'/token');
+    const pre=$('pre',{className:'mono'},cfg('<token>'));
+    const w=tokenWidget(S.me,m,draw,shown=>pre.textContent=cfg(shown?token:'<token>'));
+    card.replaceChildren(await w(token),token?$('div',{className:'well'},$('p',{className:'hint'},t('tokCfg')),pre):null);
+  };
+  await draw();
+  el.replaceChildren(sec(t('tokens'),$('p',{className:'hint'},t('tokensHint')),
+    $('p',{className:'hint'},t('tokUrl')+': ',$('code',{className:'mono'},mcp),'  ·  '+t('tokHeader')+': ',$('code',{className:'mono'},'Authorization: Bearer <token>')),card,m));
 },
 async platforms(el){
   const rows=S.platforms.map(p=>{
@@ -407,13 +428,32 @@ async admins(el){
   const row=a=>{
     const pw=$('input',{'aria-label':t('pass'),type:'password',autocomplete:'new-password',placeholder:a?t('pwKeep'):t('pwNew')}),un=$('input',{'aria-label':t('user'),value:a?.username??'',disabled:!!a}),root=$('input',{type:'checkbox','aria-label':'root',checked:!!a?.root}),m=$('span',{className:'msg',role:'status'});
     const checks=S.platforms.map(p=>[p,$('input',{type:'checkbox',checked:!!a?.platform_ids.includes(p.id)})]);
-    const save=async()=>{try{await api(a?'PUT':'POST','/api/admins'+(a?'/'+a.id:''),{username:un.value,password:pw.value,root:root.checked,platform_ids:checks.filter(([,c])=>c.checked).map(([p])=>p.id)});a?flash(m,t('saved')):render()}catch(e){flash(m,e.message,1)}};
-    return $('tr',{},$('td',{},un),$('td',{},pw),$('td',{},root),$('td',{},checks.map(([p,c])=>$('label',{className:'chk'},c,p.name))),
+    const save=async()=>{try{await api(a?'PUT':'POST','/api/admins'+(a?'/'+a.id:''),{username:un.value,password:pw.value,root:root.checked,platform_ids:checks.filter(([,c])=>c.checked).map(([p])=>p.id)});a?(pw.value?render():flash(m,t('saved'))):render()}catch(e){flash(m,e.message,1)}};
+    // The token cell: for an existing admin it shows the token on demand; the new-admin row has none.
+    const tk=$('td',{});
+    if(a){const draw=async()=>{try{const{token}=await api('GET','/api/admins/'+a.id+'/token');tk.replaceChildren(await tokenWidget(a,m,draw)(token))}catch(e){flash(m,e.message,1)}};
+      tk.append(a.has_token?$('button',{on:{click:draw}},t('tokShowB')):$('button',{on:{click:async()=>{try{await api('POST','/api/admins/'+a.id+'/token');await draw()}catch(e){flash(m,e.message,1)}}}},t('tokGen')))}
+    return $('tr',{},$('td',{},un),$('td',{},pw),$('td',{},root),$('td',{},checks.map(([p,c])=>$('label',{className:'chk'},c,p.name))),tk,
       $('td',{},$('div',{className:'acts'},$('button',{className:a?'':'p',on:{click:save}},a?t('save'):t('create')),a?$('button',{className:'d',on:{click:async()=>{if(confirm(t('delAdmin',{n:a.username}))){try{await api('DELETE','/api/admins/'+a.id);render()}catch(e){flash(m,e.message,1)}}}}},t('del')):null,m)));
   };
   el.replaceChildren(sec(t('admins'),$('p',{className:'hint'},t('adminHint')),
-    tbl([t('user'),t('pass'),'root',t('adminPlats'),''].map(h=>$('th',{},h)),[...as.map(row),row(null)])));
+    tbl([t('user'),t('pass'),'root',t('adminPlats'),t('tokCol'),''].map(h=>$('th',{},h)),[...as.map(row),row(null)])));
 }};
+
+// tokenWidget builds the token cell for admin a: the token (hidden until shown), Copy, Regenerate and Delete.
+// It reads the token only when asked, so the admin list does not carry every token.
+function tokenWidget(a,msg,redraw,onToggle){
+  return async token=>{
+    const call=async(method)=>{try{await api(method,'/api/admins/'+a.id+'/token');await redraw()}catch(e){flash(msg,e.message,1)}};
+    const gen=$('button',{className:token?'':'p',on:{click:async()=>{if(!token||confirm(t('tokRegenQ',{n:a.username})))call('POST')}}},t(token?'tokRegen':'tokGen'));
+    if(!token)return $('div',{className:'row mid'},$('span',{className:'mute'},t('tokNone')),gen);
+    const code=$('code',{className:'mono'},'•'.repeat(12));let shown=false;
+    const eye=$('button',{on:{click:()=>{shown=!shown;code.textContent=shown?token:'•'.repeat(12);eye.textContent=t(shown?'tokHide':'tokShowB');onToggle?.(shown)}}},t('tokShowB'));
+    const copy=$('button',{on:{click:async()=>{try{await navigator.clipboard.writeText(token);copy.textContent=t('tokCopied')}catch{}}}},t('tokCopy'));
+    const del=$('button',{className:'d',on:{click:()=>{if(confirm(t('tokDel',{n:a.username})))call('DELETE')}}},t('del'));
+    return $('div',{className:'row mid'},code,eye,copy,gen,del);
+  };
+}
 
 function quotaForm(init){
   const mode=$('select',{},['add','subtract','override'].map(v=>$('option',{value:v},t('mode.'+v))));
