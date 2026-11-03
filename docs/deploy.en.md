@@ -115,6 +115,28 @@ Notes:
 - If you do not set `NAPM_ADMIN_PASSWORD`, the random initial password appears only in the container log. Read it with `docker logs napm`.
 - When you mount a host directory at `/data`, the directory must be writable by UID 65532. A named volume, like `napm-data` above, needs no extra setup.
 
+With Docker Compose, save the following as `docker-compose.yml` and run `docker compose up -d` in the same directory:
+
+```yaml
+services:
+  napm:
+    image: ghcr.io/nerdneilsfield/napm:latest
+    container_name: napm
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - napm-data:/data
+    env_file: napm.env
+
+volumes:
+  napm-data:
+```
+
+Put `NAPM_ADMIN_PASSWORD=<password>` in `napm.env` and set that file to `0600`. The initial password is only used the first time the administrator is created, so the file can be deleted after the first start. It sits in its own file rather than in `docker-compose.yml` because compose files often get committed to a repository.
+
+`restart: unless-stopped` brings the container back after a host reboot, which suits running it behind a reverse proxy. `docker compose stop` sends `SIGTERM`, which interrupts a balance adjustment in progress, the same as running the binary directly.
+
 The author has not yet built and run the image to verify it.
 
 ## Backup and restore

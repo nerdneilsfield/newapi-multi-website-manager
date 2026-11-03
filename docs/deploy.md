@@ -115,6 +115,28 @@ docker run -d --name napm \
 - 不设置 `NAPM_ADMIN_PASSWORD` 时，初始随机密码只出现在容器日志中，用 `docker logs napm` 查看。
 - 把宿主机目录挂载到 `/data` 时，该目录必须允许 UID 65532 写入。使用命名卷（如上例的 `napm-data`）不需要额外设置。
 
+用 Docker Compose 时，把下面的内容存为 `docker-compose.yml`，在同一目录运行 `docker compose up -d`：
+
+```yaml
+services:
+  napm:
+    image: ghcr.io/nerdneilsfield/napm:latest
+    container_name: napm
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - napm-data:/data
+    env_file: napm.env
+
+volumes:
+  napm-data:
+```
+
+`napm.env` 里写 `NAPM_ADMIN_PASSWORD=<密码>`，权限设为 `0600`。初始密码只在第一次创建管理员时使用，所以这个文件在首次启动后就能删掉；把它单独放而不是直接写进 `docker-compose.yml`，是因为 compose 文件常被提交到仓库。
+
+`restart: unless-stopped` 会在宿主机重启后自动拉起容器，适合配合反向代理长期运行。停容器时 `docker compose stop` 发送 `SIGTERM`，正在执行的调额任务会被中断，这一点与直接运行二进制相同。
+
 镜像尚未在作者的机器上构建并运行验证过。
 
 ## 备份与恢复
