@@ -215,9 +215,9 @@ add:'添加',
 admins:'管理员',adminHint:'非 root 管理员只能看到并操作被勾选的平台；root 可管理全部平台与管理员。改密码或权限会使该管理员的登录失效，改密码还会使他的令牌失效。',tokCol:'令牌',model:'模型',
 usageNone:'还没有采集过用量。采集需要平台令牌带 log:read 权限，且站点开启了数据看板。',usageCollect:'采集用量',usageFail:'上次采集: {s}\n{e}',usageCollecting:'采集中…',usageTo:'数据已采集到 {t}',
 range:'范围',lastDays:'最近 {n} 天',vsPrev:'与前 {n} 天相比',spend:'消耗',reqs:'请求',tokensL:'Token',activeU:'活跃用户',
-dailySpend:'每日消耗',avg7:'7 日均线',peakDay:'高于常态的一天',byModel:'按模型',byUser:'按用户',share:'占比',change:'变化',newTag:'新增',
+dailySpend:'每日消耗',spendPerHour:'每小时消耗',sharePerHour:'每小时占全站的比例',hourPartial:'当前这一小时还没过完，不计入。',lastHour:'最近 1 小时',lastHours:'最近 {n} 小时',lastDay:'最近 1 天',noUsageHour:'最近这段时间没有用量，换一个范围或先确认采集已到最新。',avg7:'7 日均线',peakDay:'高于常态的一天',byModel:'按模型',byUser:'按用户',share:'占比',change:'变化',newTag:'新增',
 dayPartial:'今天还没过完，不计入',hourOfDay:'一天里的请求分布(本地时间)',insights:'看点',
-iSpend:'最近 {n} 天消耗 <b>{v}</b>，{cmp}。',iUp:'比前 {n} 天多 {p}%',iDown:'比前 {n} 天少 {p}%',iFlat:'与前 {n} 天基本持平',iNoPrev:'更早的数据还不够，无法比较',
+iSpend:'最近 {n} 天消耗 <b>{v}</b>，{cmp}。',iUp:'比前 {n} 天多 {p}%',iDown:'比前 {n} 天少 {p}%',iFlat:'与前 {n} 天基本持平',iUpH:'比前 {n} 小时多 {p}%',iDownH:'比前 {n} 小时少 {p}%',iFlatH:'与前 {n} 小时基本持平',iSpendH:'最近 {n} 小时消耗 <b>{v}</b>，{cmp}。',iSpendD:'最近 1 天消耗 <b>{v}</b>，{cmp}。',iSpendH1:'最近 1 小时消耗 <b>{v}</b>，{cmp}。',iUpH1:'比前一小时多 {p}%',iDownH1:'比前一小时少 {p}%',iFlatH1:'与前一小时基本持平',iUpD:'比前一天多 {p}%',iDownD:'比前一天少 {p}%',iFlatD:'与前一天基本持平',iNoPrev:'更早的数据还不够，无法比较',
 iRun:'按最近 7 天的日均，一个月约 <b>{v}</b>。',
 iSpike:'<b>{d}</b> 的消耗是常态的 {x} 倍，值得看一眼。',iNoSpike:'这段时间没有明显的异常日。',
 iTop:'<b>{n}</b> 一个就占了 {p}% 的消耗，前 3 位合计 {p3}%。',iTopModel:'模型里 <b>{n}</b> 占 {p}%。',
@@ -263,9 +263,9 @@ add:'Add',
 admins:'Admins',adminHint:'A non-root admin sees and operates only the ticked platforms. Root manages all platforms and admins. Changing a password or permissions signs that admin out, and a password change also revokes their token.',tokCol:'Token',model:'Model',
 usageNone:'No usage collected yet. Collecting needs the platform token to have log:read, and the site to have its data dashboard on.',usageCollect:'Collect usage',usageFail:'Last collection: {s}\n{e}',usageCollecting:'Collecting…',usageTo:'Collected up to {t}',
 range:'Range',lastDays:'Last {n} days',vsPrev:'vs the {n} days before',spend:'Spend',reqs:'Requests',tokensL:'Tokens',activeU:'Active users',
-dailySpend:'Spend per day',avg7:'7-day average',peakDay:'Day above the usual',byModel:'By model',byUser:'By user',share:'Share',change:'Change',newTag:'new',
+dailySpend:'Spend per day',spendPerHour:'Spend per hour',sharePerHour:'Hourly share of the platform',hourPartial:'The current hour is still running and is left out.',lastHour:'Last hour',lastHours:'Last {n} hours',lastDay:'Last day',noUsageHour:'No usage in this window. Pick another range, or check that collection is up to date.',avg7:'7-day average',peakDay:'Day above the usual',byModel:'By model',byUser:'By user',share:'Share',change:'Change',newTag:'new',
 dayPartial:'Today is not over, so it is not counted',hourOfDay:'Requests across the day (local time)',insights:'What stands out',
-iSpend:'Spend over the last {n} days is <b>{v}</b>, {cmp}.',iUp:'{p}% more than the {n} days before',iDown:'{p}% less than the {n} days before',iFlat:'about the same as the {n} days before',iNoPrev:'there is not enough earlier data to compare',
+iSpend:'Spend over the last {n} days is <b>{v}</b>, {cmp}.',iUp:'{p}% more than the {n} days before',iDown:'{p}% less than the {n} days before',iFlat:'about the same as the {n} days before',iUpH:'{p}% more than the {n} hours before',iDownH:'{p}% less than the {n} hours before',iFlatH:'about the same as the {n} hours before',iSpendH:'Spend over the last {n} hours is <b>{v}</b>, {cmp}.',iSpendD:'Spend over the last day is <b>{v}</b>, {cmp}.',iSpendH1:'Spend over the last hour is <b>{v}</b>, {cmp}.',iUpH1:'{p}% more than the hour before',iDownH1:'{p}% less than the hour before',iFlatH1:'about the same as the hour before',iUpD:'{p}% more than the day before',iDownD:'{p}% less than the day before',iFlatD:'about the same as the day before',iNoPrev:'there is not enough earlier data to compare',
 iRun:'At the last 7 days\' daily average, a month comes to about <b>{v}</b>.',
 iSpike:'Spend on <b>{d}</b> was {x}x the usual, worth a look.',iNoSpike:'No day stood out in this period.',
 iTop:'<b>{n}</b> alone is {p}% of spend, and the top 3 together {p3}%.',iTopModel:'Among models, <b>{n}</b> takes {p}%.',
@@ -326,10 +326,10 @@ const failBox=(e,retry)=>$('div',{className:'fail',role:'alert'},e.message,retry
 // today's midnight: for a 30-day range the hour-of-day view covers the last 13 complete days.
 // shortcut: one fixed UTC offset for the whole range, so across a DST change a day can start an hour off.
 const median=a=>{if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2};
+const sum=(rows,a,b,key)=>{const m=new Map();for(const r of rows)if(r.t>=a&&r.t<b){const k=key?r[key]:r.t,x=m.get(k)||{quota:0,count:0,tokens:0};x.quota+=r.quota;x.count+=r.count;x.tokens+=r.tokens;m.set(k,x)}return m};
+const tot=m=>{const o={quota:0,count:0,tokens:0,n:0};for(const x of m.values()){o.quota+=x.quota;o.count+=x.count;o.tokens+=x.tokens;if(x.quota>0||x.count>0)o.n++}return o};
 function analyze(day,hours,n,today,off){
   const D=86400,lo=today-n*D,plo=lo-n*D;
-  const sum=(rows,a,b,key)=>{const m=new Map();for(const r of rows)if(r.t>=a&&r.t<b){const k=key?r[key]:r.t,x=m.get(k)||{quota:0,count:0,tokens:0};x.quota+=r.quota;x.count+=r.count;x.tokens+=r.tokens;m.set(k,x)}return m};
-  const tot=m=>{const o={quota:0,count:0,tokens:0,n:0};for(const x of m.values()){o.quota+=x.quota;o.count+=x.count;o.tokens+=x.tokens;if(x.quota>0||x.count>0)o.n++}return o};
   const days=sum(day.models,plo,today+D);
   const daily=[];for(let i=0;i<n;i++){const t=lo+i*D;daily.push({t,v:days.get(t)?.quota||0,count:days.get(t)?.count||0})}
   const todayRow=days.get(today)||{quota:0,count:0};
@@ -362,6 +362,18 @@ function analyze(day,hours,n,today,off){
    if(we.length>=2&&wd.length>=5&&a(wd)>0){const r=a(we)/a(wd);if(r<.75||r>1.33)weekend=r}}
   const last7=daily.slice(-7).reduce((a,d)=>a+d.v,0)/7;
   return{n,cur,prev,hasPrev,daily,today:{t:today,v:todayRow.quota},ma,anomalies,models,users,hod,quiet,peak,weekend,movers,runRate:n>=7?last7:null};
+}
+// analyzeHours is analyze() for windows shorter than a day: the n whole hours ending at end, against the n before
+// them. Per-day statistics have no meaning at this scale, so there is no anomaly day, weekday ratio or hour-of-day.
+function analyzeHours(rows,n,end){
+  const H=3600,lo=end-n*H,plo=lo-n*H;
+  const byHour=sum(rows.models,plo,end),cur=sum(rows.models,lo,end,'model'),prev=sum(rows.models,plo,lo,'model');
+  const series=[];for(let i=0;i<n;i++){const t=lo+i*H,x=byHour.get(t);series.push({t,v:x?.quota||0,count:x?.count||0})}
+  const curT=tot(cur),prevT=tot(prev);
+  const curU=sum(rows.users,lo,end,'username'),prevU=sum(rows.users,plo,lo,'username');
+  curT.n=curU.size;prevT.n=prevU.size;
+  const rank=(a,b)=>[...a].map(([name,x])=>({name,...x,prev:b.get(name)?.quota||0})).sort((x,y)=>y.quota-x.quota);
+  return{n,cur:curT,prev:prevT,hasPrev:prevT.quota>0,series,models:rank(cur,prev),users:rank(curU,prevU)};
 }
 // niceScale picks a round step so the axis has about 4 intervals and ends at or above v.
 // ints keeps the step a whole number, for counts.
@@ -461,10 +473,24 @@ const poll=(fn)=>{clearInterval(timer);timer=setInterval(fn,2000)};
 const groupNames=async()=>{try{return((await api('GET',P()+'/stats')).stats?.groups||[]).map(g=>g.name)}catch{return[]}};
 const fig=(k,v,dl)=>$('div',{className:'fig'},$('b',{},v),$('span',{},k+(dl?'  '+dl:'')));
 const delta=(a,b,has)=>!has||b===0?'':(a>=b?'+':'−')+Math.round(Math.abs(a-b)/b*100)+'%';
-const cmpText=(r,n)=>{const p=Math.round;return !r.hasPrev?t('iNoPrev'):Math.abs(r.cur.quota-r.prev.quota)<=r.prev.quota*.05?t('iFlat',{n}):r.cur.quota>r.prev.quota?t('iUp',{n,p:p((r.cur.quota/r.prev.quota-1)*100)}):t('iDown',{n,p:p((1-r.cur.quota/r.prev.quota)*100)})};
+const cmpText=(r,n,h)=>{const p=Math.round,k=n===1?(h?'H1':'D'):h?'H':'';return !r.hasPrev?t('iNoPrev'):Math.abs(r.cur.quota-r.prev.quota)<=r.prev.quota*.05?t('iFlat'+k,{n}):r.cur.quota>r.prev.quota?t('iUp'+k,{n,p:p((r.cur.quota/r.prev.quota-1)*100)}):t('iDown'+k,{n,p:p((1-r.cur.quota/r.prev.quota)*100)})};
 const dateL=ts=>new Date(ts*1000).toLocaleDateString(loc(),{month:'numeric',day:'numeric'});
 const hourChart=(r)=>r.quiet==null?null:bars(r.hod.map((v,h)=>({x:String(h),v,cls:(h>=r.quiet&&h<r.quiet+4)||(r.quiet+4>24&&h<(r.quiet+4)%24)?'dim':'',title:`${String(h).padStart(2,'0')}:00 · ${nf(v)} ${t('reqs')}`})),{h:140,fmt:v=>nf(Math.round(v)),xl:i=>String(i),ints:true});
 const hh=h=>String(h%24).padStart(2,'0')+':00';
+// RANGES are the usage page's windows: whole days, or whole hours for anything shorter than one.
+const RANGES=['1h','5h','12h','1d','7d','14d','30d'];
+const rangeLabel=k=>{const n=parseInt(k,10),h=k.endsWith('h');return n===1?t(h?'lastHour':'lastDay'):t(h?'lastHours':'lastDays',{n})};
+const hourL=ts=>String(new Date(ts*1000).getHours()).padStart(2,'0')+':00';
+// spendChart draws the bucket series; the 7-bucket average line only exists for day windows.
+const spendChart=(u,hourly,m)=>{const anom=new Set((u.anomalies||[]).map(a=>a.t));
+  return bars((hourly?u.series:u.daily).map(d=>{const x=hourly?hourL(d.t):dateL(d.t);return{x,v:d.v,cls:anom.has(d.t)?'hot':'',title:`${x}: ${m(d.v)} · ${nf(d.count)} ${t('reqs')}`}}),{fmt:v=>m(v),line:hourly?null:u.ma})};
+// rankTable is the five-column ranking shared by the model, user and group tables.
+const rankTable=(rows,total,label,kind,hasPrev,m)=>rankTbl([label,t('spend'),t('share'),t('reqs'),t('change')].map((h,i)=>$('th',{className:i&&i!==2?'n':''},h)),
+  rows.slice(0,10).map(x=>$('tr',{},$('td',{},kind?$('button',{className:'link name',title:t(kind==='group'?'openGroup':'openUser'),on:{click:()=>{S.usageSub={kind,name:x.name};render()}}},x.name):x.name),
+    $('td',{className:'n'},m(x.quota)),
+    $('td',{},$('div',{className:'row mid',style:'margin:0'},$('div',{className:'hbar',style:'width:6rem'},$('i',{style:`width:${pct(x.quota,total)}%`})),$('span',{className:'mono'},pct(x.quota,total)+'%'))),
+    $('td',{className:'n'},nf(x.count)),
+    $('td',{className:'n '+(x.quota>=x.prev?'d-up':'d-dn')},!hasPrev?'':x.prev===0?t('newTag'):delta(x.quota,x.prev,hasPrev)))));
 // rankTbl is tbl() with the fixed column widths of .rank, so the three ranking tables line up.
 const rankTbl=(head,rows)=>{const e=tbl(head,rows);e.querySelector('table').className='rank';return e};
 // groupOf maps a username to its group as of the last statistics refresh; '' (unknown) shows as noGroup.
@@ -491,55 +517,59 @@ async stats(el){
   track();
 },
 async usage(el){
-  const n=S.usageDays||14,d0=new Date();d0.setHours(0,0,0,0);
+  const key=S.usageRange||'14d',hourly=key.endsWith('h'),n=parseInt(key,10);
+  const now=Math.floor(Date.now()/1000),hs=now-now%3600;
+  const d0=new Date();d0.setHours(0,0,0,0);
   // the offset at today's midnight, not now: the server cuts days with this one offset, so today must start on its boundary
-  const off=-d0.getTimezoneOffset()*60,tz=off/60,today=Math.floor(d0.getTime()/1000);
-  const D=86400,from=today-2*n*D,to=Math.floor(Date.now()/1000)+1;
-  const q=`from=${from}&to=${to}&tz=${tz}`;
-  const [day,hr,runs]=await Promise.all([api('GET',`${P()}/usage?${q}&step=day`),api('GET',`${P()}/usage?from=${Math.max(from,today-Math.min(n,13)*D)}&to=${to}&tz=${tz}&step=hour`),api('GET',P()+'/runs')]);
-  const run=runs.find(r=>r.kind==='usage');const busy=run&&run.status==='running';
+  const off=-d0.getTimezoneOffset()*60,tz=off/60,today=Math.floor(d0.getTime()/1000),D=86400;
+  // hour windows hold whole hours only: the current, partial hour would drag the total down
+  const from=hourly?hs-2*n*3600:today-2*n*D,to=hourly?hs:now+1;
+  const main=await api('GET',`${P()}/usage?from=${from}&to=${to}&tz=${tz}&step=${hourly?'hour':'day'}`);
+  const hr=hourly?null:await api('GET',`${P()}/usage?from=${Math.max(from,today-Math.min(n,13)*D)}&to=${to}&tz=${tz}&step=hour`);
+  const runs=await api('GET',P()+'/runs');
+  const run=runs.find(r=>r.kind==='usage'),busy=run&&run.status==='running',state=main.state;
   const msg=$('span',{className:'msg',role:'status'});
-  const sel=$('select',{'aria-label':t('range'),on:{change:e=>{S.usageDays=+e.target.value;render()}}},[7,14,30].map(k=>$('option',{value:k,selected:k===n},t('lastDays',{n:k}))));
-  const head=$('div',{className:'row mid'},fld(t('range'),sel),
+  const sel=$('select',{'aria-label':t('range'),on:{change:e=>{S.usageRange=e.target.value;render()}}},RANGES.map(k=>$('option',{value:k,selected:k===key},rangeLabel(k))));
+  const head=$('div',{className:'row'},fld(t('range'),sel),
     S.me.read_only?null:$('button',{className:'p',disabled:busy,on:{click:async()=>{try{await api('POST',P()+'/usage/collect',{});render()}catch(e){flash(msg,e.message,1)}}}},busy?t('usageCollecting'):t('usageCollect')),
-    $('span',{className:'mute'},day.state?t('usageTo',{t:fmtT(day.state.collected_to)}):''),msg);
+    $('span',{className:'mute'},state?t('usageTo',{t:fmtT(state.collected_to)}):''),msg);
   if(busy)poll(()=>render());
   const fail=run&&run.status!=='running'&&run.status!=='ok'?$('div',{className:'msg bad note'},t('usageFail',{s:t('st.'+run.status),e:run.errors})):null;
-  if(!day.state||(!day.models.length&&!day.users.length))return el.replaceChildren(sec(null,head,fail,empty(t('usageNone'))));
-  const qpu=day.state.quota_per_unit,r=analyze(day,hr,n,today,off),m=v=>money(v,qpu);
-  const gof=groupOf(day),rg=analyze({models:day.models,users:day.users.map(x=>({...x,username:gof(x.username)}))},{models:[]},n,today,off);r.groups=rg.users;
+  if(!state)return el.replaceChildren(sec(null,head,fail,empty(t('usageNone'))));
+  if(!main.models.length&&!main.users.length)return el.replaceChildren(sec(null,head,fail,empty(t('noUsageHour'))));
+  const qpu=state.quota_per_unit,m=v=>money(v,qpu),gof=groupOf(main);
+  const r=hourly?analyzeHours(main,n,hs):analyze(main,hr,n,today,off);
+  const byGroup=hourly
+    ?analyzeHours({models:main.models,users:main.users.map(x=>({...x,username:gof(x.username)}))},n,hs)
+    :analyze({models:main.models,users:main.users.map(x=>({...x,username:gof(x.username)}))},{models:[]},n,today,off);
+  r.groups=byGroup.users;
   // without the map (statistics never refreshed) every user would land in one "unknown group" row, so show nothing
-  const hasGroups=Object.keys(day.user_groups||{}).length>0&&r.groups.length>0;
-  if(S.usageSub)return el.replaceChildren(sec(null,head,fail,subjectDetail({sub:S.usageSub,day,hr,n,today,off,all:r,m})));
+  const hasGroups=Object.keys(main.user_groups||{}).length>0&&r.groups.length>0;
+  if(S.usageSub)return el.replaceChildren(sec(null,head,fail,subjectDetail({sub:S.usageSub,main,hr,n,hourly,hs,today,off,all:r,m})));
   // ---- insights: each line states a number and says why it was picked
   const L=[],p=Math.round;
   if(r.cur.quota>0||r.cur.count>0){
-    L.push(['iSpend',{n,v:m(r.cur.quota),cmp:cmpText(r,n)}]);
-    if(r.runRate!=null&&r.runRate>0)L.push(['iRun',{v:m(r.runRate*30)}]);
-    if(r.anomalies.length){const a=r.anomalies.sort((x,y)=>y.v-x.v)[0];L.push(['iSpike',{d:dateL(a.t),x:a.ratio.toFixed(1)}])}else if(n>=7)L.push(['iNoSpike']);
+    L.push([hourly?n===1?'iSpendH1':'iSpendH':n===1?'iSpendD':'iSpend',{n,v:m(r.cur.quota),cmp:cmpText(r,n,hourly)}]);
+    if(r.runRate>0)L.push(['iRun',{v:m(r.runRate*30)}]);
+    if(r.anomalies&&r.anomalies.length){const a=r.anomalies.sort((x,y)=>y.v-x.v)[0];L.push(['iSpike',{d:dateL(a.t),x:a.ratio.toFixed(1)}])}else if(!hourly&&n>=7)L.push(['iNoSpike']);
     if(r.users.length){const top=r.users[0],t3=r.users.slice(0,3).reduce((a,u)=>a+u.quota,0);if(pct(top.quota,r.cur.quota)>=30)L.push(['iTop',{n:top.name,p:pct(top.quota,r.cur.quota),p3:pct(t3,r.cur.quota)}])}
     if(r.models.length>1&&pct(r.models[0].quota,r.cur.quota)>=50)L.push(['iTopModel',{n:r.models[0].name,p:pct(r.models[0].quota,r.cur.quota)}]);
     if(r.movers){const{up,down}=r.movers;if(up&&up.d>r.prev.quota*.1)L.push(['iUp1',{n:up.name,v:m(up.d)}]);if(down&&-down.d>r.prev.quota*.1)L.push(['iDown1',{n:down.name,v:m(-down.d)}]);if(r.movers.fresh||r.movers.gone)L.push(['iNew',{a:r.movers.fresh,b:r.movers.gone}])}
-    if(r.quiet!=null){L.push(['iQuiet',{a:`${hh(r.quiet)}–${hh(r.quiet+4)}`,b:hh(r.peak)}])}
+    if(r.quiet!=null)L.push(['iQuiet',{a:`${hh(r.quiet)}–${hh(r.quiet+4)}`,b:hh(r.peak)}]);
     if(r.weekend!=null)L.push([r.weekend<1?'iWeekend':'iWeekendUp',{p:p(r.weekend*100)}]);
   }
-  const anom=new Set(r.anomalies.map(a=>a.t));
-  const dailyChart=bars(r.daily.map(d=>({x:dateL(d.t),v:d.v,cls:anom.has(d.t)?'hot':'',title:`${dateL(d.t)}: ${m(d.v)} · ${nf(d.count)} ${t('reqs')}`})),{fmt:v=>m(v),line:r.ma});
-  const hodChart=hourChart(r);
-  const table=(rows,label,total,kind)=>rankTbl([label,t('spend'),t('share'),t('reqs'),t('change')].map((h,i)=>$('th',{className:i&&i!==2?'n':''},h)),
-    rows.slice(0,10).map(x=>$('tr',{},$('td',{},kind?$('button',{className:'link name',title:t(kind==='group'?'openGroup':'openUser'),on:{click:()=>{S.usageSub={kind,name:x.name};render()}}},x.name):x.name),$('td',{className:'n'},m(x.quota)),
-      $('td',{},$('div',{className:'row mid',style:'margin:0'},$('div',{className:'hbar',style:'width:6rem'},$('i',{style:`width:${pct(x.quota,total)}%`})),$('span',{className:'mono'},pct(x.quota,total)+'%'))),
-      $('td',{className:'n'},nf(x.count)),
-      $('td',{className:'n '+(x.quota>=x.prev?'d-up':'d-dn')},!r.hasPrev?'':x.prev===0?t('newTag'):delta(x.quota,x.prev,r.hasPrev)))));
+  const hod=hourly?null:hourChart(r);
   el.replaceChildren(sec(null,head,fail,
     $('div',{className:'figs'},fig(t('spend'),m(r.cur.quota),delta(r.cur.quota,r.prev.quota,r.hasPrev)),fig(t('reqs'),nf(r.cur.count),delta(r.cur.count,r.prev.count,r.hasPrev)),fig(t('tokensL'),nf(r.cur.tokens),delta(r.cur.tokens,r.prev.tokens,r.hasPrev)),fig(t('activeU'),nf(r.cur.n),delta(r.cur.n,r.prev.n,r.hasPrev))),
     L.length?$('div',{},$('h2',{style:'margin-bottom:var(--space-sm)'},t('insights')),$('ul',{className:'insights'},L.map(([k,v])=>$('li',{},rich(k,v))))):null,
-    $('h2',{},t('dailySpend')),$('div',{className:'swatches'},$('span',{},$('i'),t('dailySpend')),$('span',{},$('i',{className:'m'}),t('avg7')),anom.size?$('span',{className:'mute'},t('peakDay')+': '+[...anom].map(dateL).join(', ')):null,$('span',{className:'mute'},t('dayPartial'))),
-    dailyChart,
-    hodChart?$('div',{},$('h2',{style:'margin-top:var(--space-lg)'},t('hourOfDay')),$('div',{style:'height:var(--space-sm)'}),hodChart):null,
-    $('h2',{style:'margin-top:var(--space-lg);margin-bottom:var(--space-sm)'},t('byModel')),table(r.models,t('model'),r.cur.quota),
-    $('h2',{style:'margin-top:var(--space-lg);margin-bottom:var(--space-sm)'},t('byUser')),table(r.users,t('user'),r.cur.quota,'user'),
-    hasGroups?$('div',{},$('h2',{style:'margin-top:var(--space-lg);margin-bottom:var(--space-sm)'},t('byGroup')),table(r.groups,t('group'),r.cur.quota,'group'),$('p',{className:'hint'},t('groupNote'))):null));
+    $('h2',{},hourly?t('spendPerHour'):t('dailySpend')),
+    hourly?$('div',{className:'swatches'},$('span',{},$('i'),t('spendPerHour')),$('span',{className:'mute'},t('hourPartial')))
+      :$('div',{className:'swatches'},$('span',{},$('i'),t('dailySpend')),$('span',{},$('i',{className:'m'}),t('avg7')),r.anomalies.length?$('span',{className:'mute'},t('peakDay')+': '+r.anomalies.map(a=>dateL(a.t)).join(', ')):null,$('span',{className:'mute'},t('dayPartial'))),
+    spendChart(r,hourly,m),
+    hod?$('div',{},$('h2',{style:'margin-top:var(--space-lg)'},t('hourOfDay')),$('div',{style:'height:var(--space-sm)'}),hod):null,
+    $('h2',{style:'margin-top:var(--space-lg);margin-bottom:var(--space-sm)'},t('byModel')),rankTable(r.models,r.cur.quota,t('model'),null,r.hasPrev,m),
+    $('h2',{style:'margin-top:var(--space-lg);margin-bottom:var(--space-sm)'},t('byUser')),rankTable(r.users,r.cur.quota,t('user'),'user',r.hasPrev,m),
+    hasGroups?$('div',{},$('h2',{style:'margin-top:var(--space-lg);margin-bottom:var(--space-sm)'},t('byGroup')),rankTable(r.groups,r.cur.quota,t('group'),'group',r.hasPrev,m),$('p',{className:'hint'},t('groupNote'))):null));
 },
 async users(el){
   const q=$('input',{name:'keyword',placeholder:t('keywordPh')}),g=$('input',{name:'group'}),out=$('div'),msg=$('span',{className:'msg',role:'status'});
@@ -689,29 +719,36 @@ function tokenWidget(a,msg,redraw,onToggle){
 // subjectDetail is the page for one user or one group (sub = {kind, name}): the same analysis as the whole-platform
 // page, on the rows of that user, or of the users now in that group. Those rows carry no model, so there is no model
 // breakdown; it adds the share of the platform instead.
-function subjectDetail({sub,day,hr,n,today,off,all,m}){
-  const name=sub.name,isGroup=sub.kind==='group',gof=groupOf(day);
+function subjectDetail({sub,main,hr,n,hourly,hs,today,off,all,m}){
+  const name=sub.name,isGroup=sub.kind==='group',gof=groupOf(main);
   const mine=rows=>rows.filter(x=>isGroup?gof(x.username)===name:x.username===name).map(x=>({...x,model:''}));
-  const u=analyze({models:mine(day.users),users:[]},{models:mine(hr.users)},n,today,off);
+  const u=hourly?analyzeHours({models:mine(main.users),users:[]},n,hs)
+    :analyze({models:mine(main.users),users:[]},{models:mine(hr.users)},n,today,off);
   const ranked=isGroup?all.groups:all.users;
   const back=$('div',{className:'row mid'},$('button',{on:{click:()=>{S.usageSub=null;render()}}},'← '+t('backUsage')),$('h2',{style:'margin:0;border:0;padding:0'},name),isGroup?$('span',{className:'mute'},t('groupTag')):null);
   if(!(u.cur.quota>0||u.cur.count>0||u.prev.quota>0))return $('div',{},back,empty(t(isGroup?'groupNoUsage':'userNoUsage',{n})));
-  const L=[['iSpend',{n,v:m(u.cur.quota),cmp:cmpText(u,n)}]],rank=ranked.findIndex(x=>x.name===name)+1;
+  const L=[[hourly?n===1?'iSpendH1':'iSpendH':n===1?'iSpendD':'iSpend',{n,v:m(u.cur.quota),cmp:cmpText(u,n,hourly)}]],rank=ranked.findIndex(x=>x.name===name)+1;
   if(all.cur.quota>0&&rank)L.push([isGroup?'iShareG':'iShare',{p:pct(u.cur.quota,all.cur.quota),r:rank,k:ranked.length}]);
-  const active=u.daily.filter(d=>d.count>0).length;L.push(['iDays',{n,a:active}]);
-  if(u.runRate>0)L.push(['iRun',{v:m(u.runRate*30)}]);
-  if(u.anomalies.length){const a=u.anomalies.sort((x,y)=>y.v-x.v)[0];L.push(['iSpike',{d:dateL(a.t),x:a.ratio.toFixed(1)}])}
-  if(u.quiet!=null)L.push(['iQuiet',{a:`${hh(u.quiet)}–${hh(u.quiet+4)}`,b:hh(u.peak)}]);
-  if(u.weekend!=null)L.push([u.weekend<1?'iWeekend':'iWeekendUp',{p:Math.round(u.weekend*100)}]);
-  const anom=new Set(u.anomalies.map(a=>a.t));
-  const mine7=bars(u.daily.map(d=>({x:dateL(d.t),v:d.v,cls:anom.has(d.t)?'hot':'',title:`${dateL(d.t)}: ${m(d.v)} · ${nf(d.count)} ${t('reqs')}`})),{fmt:v=>m(v),line:u.ma});
-  const share=bars(u.daily.map((d,i)=>{const a=all.daily[i].v,v=a>0?d.v/a*100:0;return{x:dateL(d.t),v,title:`${dateL(d.t)}: ${v.toFixed(1)}%`}}),{h:140,fmt:v=>Math.round(v*10)/10+'%'});
-  const hod=hourChart(u);
+  if(!hourly){
+    L.push(['iDays',{n,a:u.daily.filter(d=>d.count>0).length}]);
+    if(u.runRate>0)L.push(['iRun',{v:m(u.runRate*30)}]);
+    if(u.anomalies.length){const a=u.anomalies.sort((x,y)=>y.v-x.v)[0];L.push(['iSpike',{d:dateL(a.t),x:a.ratio.toFixed(1)}])}
+    if(u.quiet!=null)L.push(['iQuiet',{a:`${hh(u.quiet)}–${hh(u.quiet+4)}`,b:hh(u.peak)}]);
+    if(u.weekend!=null)L.push([u.weekend<1?'iWeekend':'iWeekendUp',{p:Math.round(u.weekend*100)}]);
+  }
+  const series=hourly?u.series:u.daily,label=hourly?hourL:dateL,anom=new Set((u.anomalies||[]).map(a=>a.t));
+  const chart=bars(series.map(d=>({x:label(d.t),v:d.v,cls:anom.has(d.t)?'hot':'',title:`${label(d.t)}: ${m(d.v)} · ${nf(d.count)} ${t('reqs')}`})),{fmt:v=>m(v),line:hourly?null:u.ma});
+  const base=hourly?all.series:all.daily;
+  const share=bars(series.map((d,i)=>{const a=base[i]?base[i].v:0,v=a>0?d.v/a*100:0;return{x:label(d.t),v,title:`${label(d.t)}: ${v.toFixed(1)}%`}}),{h:140,fmt:v=>Math.round(v*10)/10+'%'});
+  const hod=hourly?null:hourChart(u);
   return $('div',{},back,
     $('div',{className:'figs'},fig(t('spend'),m(u.cur.quota),delta(u.cur.quota,u.prev.quota,u.hasPrev)),fig(t('reqs'),nf(u.cur.count),delta(u.cur.count,u.prev.count,u.hasPrev)),fig(t('tokensL'),nf(u.cur.tokens),delta(u.cur.tokens,u.prev.tokens,u.hasPrev)),fig(t('shareAll'),pct(u.cur.quota,all.cur.quota)+'%')),
     $('h2',{style:'margin-bottom:var(--space-sm)'},t('insights')),$('ul',{className:'insights'},L.map(([k,v])=>$('li',{},rich(k,v)))),
-    $('h2',{},t('dailySpend')),$('div',{className:'swatches'},$('span',{},$('i'),t('dailySpend')),$('span',{},$('i',{className:'m'}),t('avg7')),anom.size?$('span',{className:'mute'},t('peakDay')+': '+[...anom].map(dateL).join(', ')):null,$('span',{className:'mute'},t('dayPartial'))),mine7,
-    $('h2',{style:'margin-top:var(--space-lg)'},t('shareDaily')),$('div',{style:'height:var(--space-sm)'}),share,
+    $('h2',{},hourly?t('spendPerHour'):t('dailySpend')),
+    hourly?$('div',{className:'swatches'},$('span',{},$('i'),t('spendPerHour')),$('span',{className:'mute'},t('hourPartial')))
+      :$('div',{className:'swatches'},$('span',{},$('i'),t('dailySpend')),$('span',{},$('i',{className:'m'}),t('avg7')),anom.size?$('span',{className:'mute'},t('peakDay')+': '+[...anom].map(dateL).join(', ')):null,$('span',{className:'mute'},t('dayPartial'))),
+    chart,
+    $('h2',{style:'margin-top:var(--space-lg)'},hourly?t('sharePerHour'):t('shareDaily')),$('div',{style:'height:var(--space-sm)'}),share,
     hod?$('div',{},$('h2',{style:'margin-top:var(--space-lg)'},t('hourOfDay')),$('div',{style:'height:var(--space-sm)'}),hod):null);
 }
 // quotaForm builds the balance-adjustment fields. The target is a group, typed or picked from the platform's groups, or

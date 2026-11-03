@@ -59,9 +59,9 @@ The **Usage** page answers where the money goes, when, and who is using it. Its 
 
 1. Open **Usage** and click **Collect usage**. The first run backfills the last 12 months; later runs fetch only what is new. A long backfill goes in pieces, and if it fails halfway, click again to resume from where it stopped.
 2. Under **Schedules**, add a job of type "Collect usage", for example `0 * * * *`, to keep the data fresh.
-3. Pick the last 7, 14 or 30 days at the top.
+3. Pick a range at the top: the last hour, 5 hours, 12 hours, 1 day, 7 days, 14 days or 30 days. Ranges longer than a day are counted in days, cut by your local time zone; shorter ones are counted in whole hours, and the current, unfinished hour is left out.
 
-The page shows four figures (spend, requests, tokens and active users, each compared with the period of the same length before), a set of "What stands out" lines, a bar chart of daily spend, the spread of requests across the day, and rankings by model, by user and by group.
+The page shows four figures (spend, requests, tokens and active users, each compared with the period of the same length before), a set of "What stands out" lines, a bar chart of spend per day, or per hour for the shorter ranges, the spread of requests across the day, and rankings by model, by user and by group.
 
 A user name or group name in the rankings opens that user's or group's own page: spend, requests, share of the platform, spend per day, daily share of the platform, requests across the day, and a set of "What stands out" lines about it. The **Usage** button on each row of the **Users** page goes straight to that user. Groups are the ones users were in at the last statistics refresh, so refresh statistics once before **By group** appears. A user who has since moved is counted, history included, in the new group.
 
@@ -72,7 +72,7 @@ Every line under "What stands out" is computed from your data, and a line withou
 - One user or model with a very large share; the biggest rise and drop among users; how many users are new and how many did not appear again.
 - The quietest four hours in a row each day, a good window for maintenance or bulk adjustments, and the busiest hour; weekends clearly lower or higher than weekdays.
 
-The analysis runs in your browser. The server stores only the hourly rows. A "day" follows your computer's local time zone, and today is not counted because it is not over. Usage is kept for 12 months by default, set with `--usage-months`; rows beyond that are deleted after each collection.
+The analysis runs in your browser. The server stores only the hourly rows. A "day" follows your computer's local time zone, and today is not counted because it is not over. An hour range works the same way: only finished hours are counted. Anomaly days, the weekend ratio and the hour-of-day view only appear in day ranges, since one or two hours cannot support them. Usage is kept for 12 months by default, set with `--usage-months`; rows beyond that are deleted after each collection.
 
 ## Change balances
 
