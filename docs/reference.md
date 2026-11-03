@@ -150,7 +150,7 @@ napm 接受 `robfig/cron` 的标准写法，表达式不含秒字段：
 | 方法与路径 | 说明 |
 | --- | --- |
 | `POST /api/platforms/{id}/usage/collect` | 开始采集用量，返回 `{"run_id"}`。需要平台令牌带 `log:read`。该平台已有任务在运行时返回 `409`。 |
-| `GET /api/platforms/{id}/usage` | 返回已采集的用量，不做分析。 |
+| `GET /api/platforms/{id}/usage` | 返回已采集的用量，不做分析。除 `models`、`users` 外还有 `user_groups`，即上次刷新统计时每个用户名所在的分组。 |
 
 `GET` 的查询参数：
 
@@ -307,6 +307,7 @@ SQLite 数据库包含下列表：
 | `platforms` | 平台，令牌以明文保存。 |
 | `admin_platforms` | 管理员与平台的授权关系。 |
 | `snapshots` | 每个平台最近一次统计快照。 |
+| `user_group` | 上次刷新统计时每个用户名所在的分组，用量页按分组汇总时用。 |
 | `usage_model`、`usage_user` | 采集到的小时级用量，按平台、小时和模型或用户各一行。 |
 | `usage_state` | 每个平台用量采集到哪个时间，以及当时的 `quota_per_unit`。 |
 | `jobs` | 定时任务。 |

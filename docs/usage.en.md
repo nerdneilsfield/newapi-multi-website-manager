@@ -61,7 +61,9 @@ The **Usage** page answers where the money goes, when, and who is using it. Its 
 2. Under **Schedules**, add a job of type "Collect usage", for example `0 * * * *`, to keep the data fresh.
 3. Pick the last 7, 14 or 30 days at the top.
 
-The page shows four figures (spend, requests, tokens and active users, each compared with the period of the same length before), a set of "What stands out" lines, a bar chart of daily spend, the spread of requests across the day, and rankings by model and by user.
+The page shows four figures (spend, requests, tokens and active users, each compared with the period of the same length before), a set of "What stands out" lines, a bar chart of daily spend, the spread of requests across the day, and rankings by model, by user and by group.
+
+A user name or group name in the rankings opens that user's or group's own page: spend, requests, share of the platform, spend per day, daily share of the platform, requests across the day, and a set of "What stands out" lines about it. The **Usage** button on each row of the **Users** page goes straight to that user. Groups are the ones users were in at the last statistics refresh, so refresh statistics once before **By group** appears. A user who has since moved is counted, history included, in the new group.
 
 Every line under "What stands out" is computed from your data, and a line without support does not appear:
 
@@ -80,7 +82,7 @@ The analysis runs in your browser. The server stores only the hourly rows. A "da
    - Subtract: subtract the amount from the current balance.
    - Set: set the balance to the amount, whatever the balance was before.
 3. Enter the amount and choose the unit. **USD** converts the amount to quota with the target site's `quota_per_unit`. **Raw quota** uses the number as entered.
-4. Choose the target: **Whole group** with a group name, or **Specific user IDs** with comma-separated user IDs. An ID written more than once is handled once.
+4. Choose the target: **Whole group**, typing the group name; the box suggests the known groups (the list comes from the last statistics refresh), and a group the site added since then can simply be typed; or **Specific users**, ticking users in the table below. The table filters by keyword and group, and the picked users stay when you change page or filter. The tags above the table remove them one by one.
 5. Click **Run** and confirm the dialog.
 
 The change runs in the background and the page returns at once. Open **Runs** to see progress and the result.
@@ -125,7 +127,7 @@ napm offers an MCP endpoint, so an AI client can read statistics, change balance
 
 1. Log in to the web page, open **Tokens** and click **Generate token**. Root can also generate one for any administrator on the **Admins** page.
 2. Click **Show** to see the full token and a client configuration, and **Copy** to copy the token.
-3. Put the configuration into an MCP client that supports HTTP transport and custom headers. The URL is `<napm address>/mcp` and the header is `Authorization: Bearer <token>`.
+3. Put the configuration into an MCP client that supports HTTP transport and custom headers. The URL is `<napm address>/mcp` and the header is `Authorization: Bearer <token>`. The page starts from the address of the browser tab. If clients reach napm at another address, such as a reverse-proxy domain, change it in **Address clients use to reach napm**. The configuration follows, and the browser remembers it.
 
 Each administrator has one token, and you can see it at any time. **Regenerate** replaces it with a new one and the old one stops working at once, so update any client that uses it. **Delete** leaves you with no token.
 

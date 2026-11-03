@@ -688,11 +688,15 @@ func TestUsageEndpointFollowsGrantsAndReadOnly(t *testing.T) {
 		[]store.UserHour{{T: h, Username: "a", Count: 2, Quota: 20, Tokens: 200}}); err != nil {
 		t.Fatal(err)
 	}
+	if err := st.SaveUserGroups(1, map[string]string{"a": "vip"}); err != nil {
+		t.Fatal(err)
+	}
 	type resp struct {
-		State  *store.UsageState
-		Step   string
-		Models []store.UsageHour
-		Users  []store.UserHour
+		State      *store.UsageState
+		Step       string
+		Models     []store.UsageHour
+		Users      []store.UserHour
+		UserGroups map[string]string `json:"user_groups"`
 	}
 	get := func(c []*http.Cookie, path string) (int, resp) {
 		code, b := call(t, srv, c, "GET", path, "")
@@ -703,6 +707,9 @@ func TestUsageEndpointFollowsGrantsAndReadOnly(t *testing.T) {
 	q := "/api/platforms/1/usage?from=" + strconv.FormatInt(h-86400, 10) + "&to=" + strconv.FormatInt(h+86400, 10)
 
 	c, r := get(rootC, q)
+	if r.UserGroups["a"] != "vip" {
+		t.Fatalf("user_groups: %+v", r.UserGroups)
+	}
 	if c != 200 || r.Step != "day" || r.State == nil || r.State.QuotaPerUnit != 500000 || len(r.Models) != 2 || r.Models[0].Quota != 20 || r.Models[1].Quota != 5 {
 		t.Fatalf("UTC days: %d %+v", c, r)
 	}

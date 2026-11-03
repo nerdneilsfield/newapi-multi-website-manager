@@ -474,7 +474,12 @@ func (s *Server) usage(w http.ResponseWriter, r *http.Request, _ store.Admin) {
 		fail(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, map[string]any{"state": state, "from": from, "to": to, "step": map[bool]string{true: "day", false: "hour"}[day], "models": models, "users": users})
+	groups, err := s.Store.UserGroups(id)
+	if err != nil {
+		fail(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, map[string]any{"state": state, "from": from, "to": to, "step": map[bool]string{true: "day", false: "hour"}[day], "models": models, "users": users, "user_groups": groups})
 }
 
 // started answers a run launch and calls onStart once the run exists.

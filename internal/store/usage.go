@@ -104,3 +104,37 @@ func (s *Store) UsageUsers(platformID, from, to int64, day bool, tz int) ([]User
 		FROM usage_user WHERE platform_id=? AND hour>=? AND hour<? GROUP BY t, username ORDER BY t, username`, append(args, platformID, from, to)...)
 	return out, err
 }
+
+// SaveUserGroups replaces the platform's username -> group map.
+func (s *Store) SaveUserGroups(platformID int64, groups map[string]string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err = tx.Exec(`DELETE FROM user_group WHERE platform_id=?`, platformID); err != nil {
+		return err
+	}
+	for u, g := range groups {
+		if _, err = tx.Exec(`INSERT INTO user_group(platform_id,username,grp) VALUES(?,?,?)`, platformID, u, g); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// UserGroups returns the username -> group map saved by the last statistics refresh.
+func (s *Store) UserGroups(platformID int64) (map[string]string, error) {
+	var rows []struct {
+		Username string `db:"username"`
+		Grp      string `db:"grp"`
+	}
+	if err := sqlscan.Select(context.Background(), s.db, &rows, `SELECT username,grp FROM user_group WHERE platform_id=?`, platformID); err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.Username] = r.Grp
+	}
+	return out, nil
+}

@@ -141,6 +141,16 @@ func TestRefreshAggregatesByGroup(t *testing.T) {
 	if s.Users != 3 || s.Quota != 1105 || len(s.Groups) != 2 || s.Groups[1].Name != "vip" || s.Groups[1].Quota != 1005 {
 		t.Fatalf("unexpected stats: %+v", s)
 	}
+	// The usage page needs each user's group, and a refresh replaces the map instead of adding to it.
+	if err := st.SaveUserGroups(pid, map[string]string{"gone": "old"}); err != nil {
+		t.Fatal(err)
+	}
+	id, _ = m.Refresh(pid, nil, "", "test")
+	waitRun(t, st, id)
+	groups, _ := st.UserGroups(pid)
+	if _, stale := groups["gone"]; stale || len(groups) != 3 || groups["a"] != "default" || groups["c"] != "vip" {
+		t.Fatalf("user groups after the second refresh: %v", groups)
+	}
 }
 
 func TestQuotaGroupUsdAndGuards(t *testing.T) {

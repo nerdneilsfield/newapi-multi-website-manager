@@ -128,7 +128,7 @@ Fields of `stats`:
 | Method and path | Description |
 | --- | --- |
 | `POST /api/platforms/{id}/usage/collect` | Starts collecting usage and returns `{"run_id"}`. The platform token needs `log:read`. Returns `409` when a run is already in progress on the platform. |
-| `GET /api/platforms/{id}/usage` | Returns the collected usage, without any analysis. |
+| `GET /api/platforms/{id}/usage` | Returns the collected usage, without any analysis. Besides `models` and `users` it has `user_groups`, the group each username was in at the last statistics refresh. |
 
 Query parameters of the `GET`:
 
@@ -307,6 +307,7 @@ The SQLite database contains these tables:
 | `platforms` | Platforms. Tokens are stored in plaintext. |
 | `admin_platforms` | Which administrator may manage which platform. |
 | `snapshots` | The latest statistics snapshot of each platform. |
+| `user_group` | The group each username was in at the last statistics refresh, used to total usage by group. |
 | `usage_model`, `usage_user` | Collected hourly usage, one row per platform, hour and model or user. |
 | `usage_state` | How far each platform's usage has been collected, and its `quota_per_unit` at the time. |
 | `jobs` | Scheduled jobs. |

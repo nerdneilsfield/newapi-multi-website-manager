@@ -239,6 +239,7 @@ func (m *Manager) Refresh(platformID int64, jobID *int64, title, by string) (int
 		}
 		st := Stats{At: time.Now().Unix(), QuotaPerUnit: qpu, Users: len(users)}
 		by := map[string]*GroupStat{}
+		groupOf := make(map[string]string, len(users))
 		for _, n := range names {
 			by[n] = &GroupStat{Name: n}
 		}
@@ -248,6 +249,7 @@ func (m *Manager) Refresh(platformID int64, jobID *int64, title, by string) (int
 				g = &GroupStat{Name: u.Group}
 				by[u.Group] = g
 			}
+			groupOf[u.Username] = u.Group
 			g.Users++
 			g.Quota += u.Quota
 			g.Used += u.UsedQuota
@@ -260,6 +262,9 @@ func (m *Manager) Refresh(platformID int64, jobID *int64, title, by string) (int
 			st.Groups = append(st.Groups, *g)
 		}
 		sort.Slice(st.Groups, func(i, j int) bool { return st.Groups[i].Name < st.Groups[j].Name })
+		if err := m.Store.SaveUserGroups(platformID, groupOf); err != nil {
+			return 0, 0, nil, err
+		}
 		b, _ := json.Marshal(st)
 		return 1, 1, nil, m.Store.SaveSnapshot(platformID, b)
 	})
