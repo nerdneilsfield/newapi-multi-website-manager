@@ -42,7 +42,6 @@ dockers_v2:
     ids:
       - napm
     images:
-      - nerdneils/napm
       - ghcr.io/nerdneilsfield/napm
     tags:
       - "{{ .Tag }}"

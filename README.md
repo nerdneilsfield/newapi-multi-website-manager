@@ -69,7 +69,7 @@ make check
 
 Git 钩子检查暂存的 Go 文件格式，并要求提交信息符合 Conventional Commits。
 
-发布时推送 `v*` 标签，由 GoReleaser 构建二进制和镜像。发布流程需要仓库密钥 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`。只发布到 GHCR 时，删除 Docker Hub 登录步骤和 `.goreleaser.yml` 中的 `nerdneils/napm` 镜像。
+发布时推送 `v*` 标签，由 GoReleaser 构建二进制和镜像。镜像只发布到 `ghcr.io/nerdneilsfield/napm`，用仓库自带的 `GITHUB_TOKEN` 认证，不需要额外配置密钥。
 
 ## 许可证
 

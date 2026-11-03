@@ -71,7 +71,7 @@ make check
 
 The Git hooks check the format of staged Go files and require Conventional Commit messages.
 
-To release, push a `v*` tag; GoReleaser builds the binaries and images. The release workflow needs the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. To publish only to GHCR, remove the Docker Hub login step and the `nerdneils/napm` image from `.goreleaser.yml`.
+To release, push a `v*` tag; GoReleaser builds the binaries and images. Images go only to `ghcr.io/nerdneilsfield/napm`, authenticated with the repository's own `GITHUB_TOKEN`, so no extra secret is needed.
 
 ## License
 
