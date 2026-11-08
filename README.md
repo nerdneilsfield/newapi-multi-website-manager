@@ -21,6 +21,19 @@ napm 尚未对真实的 new-api 站点做过验证，请先在测试站点上试
 - napm 只提供明文 HTTP，没有 TLS。详见[部署与安全](docs/deploy.md)。
 - 平台令牌以明文存放在 SQLite 文件中。
 
+## 通过 Homebrew / Scoop 安装
+
+```bash
+# macOS / Linux
+brew install --cask nerdneilsfield/apps/napm
+```
+
+```powershell
+# Windows
+scoop bucket add nerdneilsfield https://github.com/nerdneilsfield/homebrew-apps
+scoop install nerdneilsfield/napm
+```
+
 ## 安装
 
 需要 Go 1.27.1 或更新版本。
