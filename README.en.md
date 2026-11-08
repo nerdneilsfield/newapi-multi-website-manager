@@ -21,6 +21,19 @@ napm has not been verified against a real new-api site. Try it on a test site fi
 - napm serves plain HTTP and has no TLS. See [Deployment and security](docs/deploy.en.md).
 - Platform tokens are stored in plaintext in the SQLite file.
 
+## Homebrew / Scoop
+
+```bash
+# macOS / Linux
+brew install --cask nerdneilsfield/apps/napm
+```
+
+```powershell
+# Windows
+scoop bucket add nerdneilsfield https://github.com/nerdneilsfield/homebrew-apps
+scoop install nerdneilsfield/napm
+```
+
 ## Installation
 
 Requires Go 1.27.1 or newer.
